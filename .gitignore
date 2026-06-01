@@ -1,0 +1,17 @@
+# ── Backend ──────────────────────────────────────
+backend/target/
+backend/data/
+backend/.mvn/wrapper/maven-wrapper.jar
+*.class
+*.jar
+!backend/target/finance-app-0.0.1-SNAPSHOT.jar
+
+# ── Frontend ─────────────────────────────────────
+frontend/node_modules/
+frontend/dist/
+
+# ── OS / IDE ─────────────────────────────────────
+.DS_Store
+*.iml
+.idea/
+.vscode/
