@@ -1,47 +1,66 @@
 import { useState, useEffect } from 'react';
 import { getAllCodes, createCode, updateCode, deleteCode, restoreCode } from '../api';
 
-// 코드 그룹 목록 (순서 고정)
-const CODE_GROUPS = ['대분류', '소득유형', '비용유형', '투자유형', '기관유형', '카드사', '보험사', '은행', '증권사'];
+const EMPTY = { cdId: '', cdNm: '', cdLevel: 1, parentCdId: '', sortOrder: 1, delYn: 'N' };
 
-const EMPTY = { codeGroup: '대분류', parentId: '', code: '', codeName: '', sortOrder: 0 };
+// 계층 정렬: 부모 바로 아래 자식이 오도록 트리 평탄화
+function buildTree(codes, showDeleted) {
+  const visible = codes.filter(c => showDeleted || c.delYn === 'N');
+  const byParent = {};
+  visible.forEach(c => {
+    const key = c.parentCdId || '__root__';
+    (byParent[key] = byParent[key] || []).push(c);
+  });
+  Object.values(byParent).forEach(arr =>
+    arr.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+  );
+  const result = [];
+  const walk = (parentKey) => {
+    (byParent[parentKey] || []).forEach(c => {
+      result.push(c);
+      walk(c.cdId);
+    });
+  };
+  walk('__root__');
+  return result;
+}
 
 export default function CommonCodesPage() {
   const [allCodes, setAllCodes] = useState([]);
-  const [selectedGroup, setSelectedGroup] = useState('대분류');
   const [modal, setModal] = useState(null);
   const [showDeleted, setShowDeleted] = useState(false);
 
   const load = () => getAllCodes().then(setAllCodes);
   useEffect(() => { load(); }, []);
 
-  const groupedCodes = allCodes.filter(c =>
-    c.codeGroup === selectedGroup && (showDeleted || c.delYn === 'N')
-  ).sort((a, b) => a.sortOrder - b.sortOrder);
-
-  // 상위 코드 목록 (해당 그룹의 상위가 될 수 있는 것들)
+  const tree = buildTree(allCodes, showDeleted);
   const parentOptions = allCodes.filter(c => c.delYn === 'N');
 
-  const openAdd = () => setModal({ mode: 'add', data: { ...EMPTY, codeGroup: selectedGroup } });
+  const openAdd = () => setModal({ mode: 'add', data: { ...EMPTY } });
   const openEdit = (row) => setModal({ mode: 'edit', data: { ...row } });
   const closeModal = () => setModal(null);
 
   const handleSave = async (data) => {
-    const payload = { ...data, parentId: data.parentId || null };
+    const payload = {
+      ...data,
+      parentCdId: data.parentCdId || null,
+      cdLevel: +data.cdLevel,
+      sortOrder: +data.sortOrder,
+    };
     if (modal.mode === 'add') await createCode(payload);
-    else await updateCode(data.id, payload);
+    else await updateCode(data.cdId, payload);
     closeModal();
     load();
   };
 
   const handleDelete = async (c) => {
-    if (!confirm(`'${c.codeName}'을(를) 삭제할까요? (복구 가능)`)) return;
-    await deleteCode(c.id);
+    if (!confirm(`'${c.cdNm}'을(를) 삭제할까요? (복구 가능)`)) return;
+    await deleteCode(c.cdId);
     load();
   };
 
   const handleRestore = async (c) => {
-    await restoreCode(c.id);
+    await restoreCode(c.cdId);
     load();
   };
 
@@ -56,46 +75,41 @@ export default function CommonCodesPage() {
         </label>
       </div>
 
-      {/* 그룹 탭 */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 16, flexWrap: 'wrap' }}>
-        {CODE_GROUPS.map(g => (
-          <button
-            key={g}
-            className={`btn ${selectedGroup === g ? 'btn-primary' : ''}`}
-            style={selectedGroup !== g ? { background: '#e8eaf6', color: '#3949ab' } : {}}
-            onClick={() => setSelectedGroup(g)}
-          >
-            {g}
-          </button>
-        ))}
-      </div>
-
       <div className="table-wrap">
         <table>
           <thead>
             <tr>
-              <th>ID</th>
-              <th>코드값</th>
-              <th>표시명</th>
-              <th>상위코드</th>
+              <th>공통코드ID</th>
+              <th>공통코드명</th>
+              <th>레벨</th>
+              <th>부모코드</th>
               <th>순서</th>
               <th>상태</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
-            {groupedCodes.length === 0 && (
+            {tree.length === 0 && (
               <tr><td colSpan={7} className="empty-state">코드가 없어요. 추가해보세요.</td></tr>
             )}
-            {groupedCodes.map(c => {
-              const parent = allCodes.find(p => p.id === c.parentId);
+            {tree.map(c => {
+              const parent = allCodes.find(p => p.cdId === c.parentCdId);
               return (
-                <tr key={c.id} style={c.delYn === 'Y' ? { opacity: 0.4 } : {}}>
-                  <td style={{ color: '#999', fontSize: 11 }}>{c.id}</td>
-                  <td><code style={{ background: '#e8eaf6', padding: '2px 6px', borderRadius: 4, fontSize: 12 }}>{c.code}</code></td>
-                  <td style={{ fontWeight: 600 }}>{c.codeName}</td>
-                  <td style={{ color: '#666', fontSize: 12 }}>{parent ? `${parent.codeName} (${parent.code})` : '-'}</td>
-                  <td style={{ color: '#999' }}>{c.sortOrder}</td>
+                <tr key={c.cdId} style={c.delYn === 'Y' ? { opacity: 0.4 } : {}}>
+                  <td>
+                    <code style={{ background: '#e8eaf6', padding: '2px 6px', borderRadius: 4, fontSize: 12 }}>
+                      {c.cdId}
+                    </code>
+                  </td>
+                  <td style={{ fontWeight: 600, paddingLeft: 12 + c.cdLevel * 16 }}>
+                    {c.cdLevel > 0 && <span style={{ color: '#bbb', marginRight: 4 }}>└</span>}
+                    {c.cdNm}
+                  </td>
+                  <td style={{ color: '#999', textAlign: 'center' }}>{c.cdLevel}</td>
+                  <td style={{ color: '#666', fontSize: 12 }}>
+                    {parent ? `${parent.cdNm} (${parent.cdId})` : '-'}
+                  </td>
+                  <td style={{ color: '#999', textAlign: 'center' }}>{c.sortOrder}</td>
                   <td>
                     <span style={{
                       padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 600,
@@ -127,7 +141,6 @@ export default function CommonCodesPage() {
         <CodeModal
           modal={modal}
           parentOptions={parentOptions}
-          codeGroups={CODE_GROUPS}
           onSave={handleSave}
           onClose={closeModal}
         />
@@ -136,7 +149,7 @@ export default function CommonCodesPage() {
   );
 }
 
-function CodeModal({ modal, parentOptions, codeGroups, onSave, onClose }) {
+function CodeModal({ modal, parentOptions, onSave, onClose }) {
   const [form, setForm] = useState(modal.data);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -146,27 +159,30 @@ function CodeModal({ modal, parentOptions, codeGroups, onSave, onClose }) {
         <h3>{modal.mode === 'add' ? '코드 추가' : '코드 수정'}</h3>
         <div className="form-grid">
           <div className="form-group">
-            <label>코드 그룹</label>
-            <select value={form.codeGroup} onChange={e => set('codeGroup', e.target.value)}>
-              {codeGroups.map(g => <option key={g}>{g}</option>)}
-            </select>
+            <label>공통코드ID</label>
+            <input
+              value={form.cdId}
+              onChange={e => set('cdId', e.target.value.toUpperCase())}
+              placeholder="예: CD2150"
+              disabled={modal.mode === 'edit'}
+            />
           </div>
           <div className="form-group">
-            <label>상위코드 (없으면 빈칸)</label>
-            <select value={form.parentId || ''} onChange={e => set('parentId', e.target.value ? +e.target.value : null)}>
+            <label>공통코드명</label>
+            <input value={form.cdNm} onChange={e => set('cdNm', e.target.value)} placeholder="예: 교통비" />
+          </div>
+          <div className="form-group">
+            <label>코드레벨</label>
+            <input type="number" min={0} max={3} value={form.cdLevel} onChange={e => set('cdLevel', +e.target.value)} />
+          </div>
+          <div className="form-group">
+            <label>부모코드 (없으면 ROOT)</label>
+            <select value={form.parentCdId || ''} onChange={e => set('parentCdId', e.target.value || null)}>
               <option value="">없음</option>
               {parentOptions.map(p => (
-                <option key={p.id} value={p.id}>{p.codeName} ({p.codeGroup})</option>
+                <option key={p.cdId} value={p.cdId}>{p.cdNm} ({p.cdId})</option>
               ))}
             </select>
-          </div>
-          <div className="form-group">
-            <label>코드값 (영문)</label>
-            <input value={form.code} onChange={e => set('code', e.target.value.toUpperCase())} placeholder="예: SALARY" />
-          </div>
-          <div className="form-group">
-            <label>표시명</label>
-            <input value={form.codeName} onChange={e => set('codeName', e.target.value)} placeholder="예: 급여" />
           </div>
           <div className="form-group">
             <label>정렬순서</label>

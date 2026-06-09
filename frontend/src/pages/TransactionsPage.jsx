@@ -1,16 +1,20 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   getTransactions, createTransaction, updateTransaction, deleteTransaction,
-  getCodesByGroup, getAllCodes
+  getAllCodes
 } from '../api';
 
 const fmt = (n) => n != null ? Number(n).toLocaleString('ko-KR') : '-';
 
-// 대분류 코드 → 색상 클래스
+const ROOT = 'CD0000';
+const ORG_ROOT = 'CD3000';   // 기관분류
+const INCOME = 'CD1000';     // 소득
+
+// 대분류 코드 → 색상
 const CATEGORY_STYLE = {
-  INCOME:  { bg: '#e8f5e9', color: '#2e7d32' },
-  EXPENSE: { bg: '#ffebee', color: '#c62828' },
-  INVEST:  { bg: '#e8eaf6', color: '#283593' },
+  CD1000: { bg: '#e8f5e9', color: '#2e7d32' }, // 소득
+  CD2000: { bg: '#ffebee', color: '#c62828' }, // 비용
+  CD4000: { bg: '#e8eaf6', color: '#283593' }, // 투자
 };
 
 const EMPTY_FORM = {
@@ -25,37 +29,32 @@ export default function TransactionsPage() {
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [rows, setRows]   = useState([]);
   const [modal, setModal] = useState(null);
-
-  // 공통코드 캐시
-  const [categories, setCategories]     = useState([]);  // 대분류
-  const [allSubcodes, setAllSubcodes]   = useState([]);  // 소득유형+비용유형+투자유형
-  const [orgTypes, setOrgTypes]         = useState([]);  // 기관유형
-  const [allOrgs, setAllOrgs]           = useState([]);  // 카드사+보험사+은행+증권사 통합
+  const [codes, setCodes] = useState([]);   // 활성 코드 전체
 
   useEffect(() => {
-    // 공통코드 한 번에 로드
-    Promise.all([
-      getCodesByGroup('대분류'),
-      getAllCodes(),
-    ]).then(([cats, all]) => {
-      setCategories(cats);
-      // 소분류: 소득유형/비용유형/투자유형
-      setAllSubcodes(all.filter(c =>
-        ['소득유형','비용유형','투자유형'].includes(c.codeGroup) && c.delYn === 'N'
-      ));
-      // 기관유형 (카드사/보험사/은행/증권사 상위)
-      setOrgTypes(all.filter(c => c.codeGroup === '기관유형' && c.delYn === 'N'));
-      // 실제 기관 목록
-      setAllOrgs(all.filter(c =>
-        ['카드사','보험사','은행','증권사'].includes(c.codeGroup) && c.delYn === 'N'
-      ));
-    });
+    getAllCodes().then(all => setCodes(all.filter(c => c.delYn === 'N')));
   }, []);
 
-  const load = useCallback(() => {
-    return getTransactions(year, month).then(setRows);
-  }, [year, month]);
+  // ── 코드 헬퍼 ──────────────────────────────────
+  const childrenOf = (pid) =>
+    codes.filter(c => c.parentCdId === pid).sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+  const nameById = (cdId) => codes.find(c => c.cdId === cdId)?.cdNm ?? cdId ?? '-';
+  // 특정 코드의 말단(leaf) 후손들 = 실제 선택 가능한 항목
+  const leafDescendants = (cdId) => {
+    const kids = childrenOf(cdId);
+    if (kids.length === 0) return [];
+    return kids.flatMap(k => {
+      const grand = leafDescendants(k.cdId);
+      return grand.length ? grand : [k];
+    });
+  };
 
+  // 거래 대분류 = ROOT의 자식 중 기관분류 제외 (소득/비용/투자)
+  const categories = childrenOf(ROOT).filter(c => c.cdId !== ORG_ROOT);
+  // 기관 종류 = 기관분류의 자식 (카드사/보험사/은행/증권사)
+  const orgTypes = childrenOf(ORG_ROOT);
+
+  const load = useCallback(() => getTransactions(year, month).then(setRows), [year, month]);
   useEffect(() => { load(); }, [load]);
 
   const openAdd  = () => setModal({ mode: 'add',  data: { ...EMPTY_FORM, year, month } });
@@ -70,24 +69,20 @@ export default function TransactionsPage() {
   };
 
   const handleDelete = async (id) => {
-    if (!confirm('삭제할까요? (복구 불가능 아님, 소프트 삭제)')) return;
+    if (!confirm('삭제할까요? (소프트 삭제)')) return;
     await deleteTransaction(id);
     load();
   };
 
-  // 코드 → 표시명 변환 헬퍼
-  const catName  = (code) => categories.find(c => c.code === code)?.codeName ?? code;
-  const subName  = (code) => allSubcodes.find(c => c.code === code)?.codeName ?? code;
-  const orgName  = (code) => allOrgs.find(c => c.code === code)?.codeName ?? code;
   const catStyle = (code) => CATEGORY_STYLE[code] ?? { bg: '#f5f5f5', color: '#555' };
 
   // 대분류별 그룹핑
   const grouped = categories
-    .filter(cat => rows.some(r => r.categoryCode === cat.code))
-    .map(cat => ({ cat, items: rows.filter(r => r.categoryCode === cat.code) }));
+    .filter(cat => rows.some(r => r.categoryCode === cat.cdId))
+    .map(cat => ({ cat, items: rows.filter(r => r.categoryCode === cat.cdId) }));
 
-  const totalIncome  = rows.filter(r => r.categoryCode === 'INCOME').reduce((s, r) => s + (r.amount || 0), 0);
-  const totalExpense = rows.filter(r => r.categoryCode !== 'INCOME').reduce((s, r) => s + (r.amount || 0), 0);
+  const totalIncome  = rows.filter(r => r.categoryCode === INCOME).reduce((s, r) => s + (r.amount || 0), 0);
+  const totalExpense = rows.filter(r => r.categoryCode !== INCOME).reduce((s, r) => s + (r.amount || 0), 0);
 
   return (
     <div>
@@ -137,23 +132,23 @@ export default function TransactionsPage() {
               <tr><td colSpan={8} className="empty-state">이 달의 데이터가 없어요.</td></tr>
             )}
             {grouped.map(({ cat, items }) => {
-              const style = catStyle(cat.code);
+              const style = catStyle(cat.cdId);
               return items.map((row, i) => (
                 <tr key={row.id}>
                   {i === 0 && (
                     <td rowSpan={items.length + 1}>
                       <span className="category-label" style={{ background: style.bg, color: style.color }}>
-                        {cat.codeName}
+                        {cat.cdNm}
                       </span>
                     </td>
                   )}
-                  <td>{subName(row.subcategoryCode)}</td>
-                  <td className={cat.code === 'INCOME' ? 'amount-positive' : 'amount-negative'}>
+                  <td>{nameById(row.subcategoryCode)}</td>
+                  <td className={cat.cdId === INCOME ? 'amount-positive' : 'amount-negative'}>
                     {fmt(row.amount)}
                   </td>
                   <td>{row.transactionDay ? `${row.transactionDay}일` : ''}</td>
                   <td style={{ color: '#888', fontSize: 12 }}>{row.billingDay ? `청구일 ${row.billingDay}일` : ''}</td>
-                  <td>{orgName(row.orgCode)}</td>
+                  <td>{row.orgCode ? nameById(row.orgCode) : ''}</td>
                   <td style={{ color: '#888' }}>{row.note}</td>
                   <td>
                     <button className="btn btn-edit" onClick={() => openEdit(row)} style={{ marginRight: 4 }}>수정</button>
@@ -161,7 +156,7 @@ export default function TransactionsPage() {
                   </td>
                 </tr>
               )).concat(
-                <tr key={`sum-${cat.code}`} className="summary-row">
+                <tr key={`sum-${cat.cdId}`} className="summary-row">
                   <td style={{ color: '#555' }}>소계</td>
                   <td>{fmt(items.reduce((s, r) => s + (r.amount || 0), 0))}</td>
                   <td colSpan={6}></td>
@@ -176,9 +171,8 @@ export default function TransactionsPage() {
         <TransactionModal
           modal={modal}
           categories={categories}
-          allSubcodes={allSubcodes}
           orgTypes={orgTypes}
-          allOrgs={allOrgs}
+          leafDescendants={leafDescendants}
           onSave={handleSave}
           onClose={closeModal}
         />
@@ -187,20 +181,16 @@ export default function TransactionsPage() {
   );
 }
 
-function TransactionModal({ modal, categories, allSubcodes, orgTypes, allOrgs, onSave, onClose }) {
+function TransactionModal({ modal, categories, orgTypes, leafDescendants, onSave, onClose }) {
   const [form, setForm] = useState(modal.data);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
-  // 선택한 대분류에 따라 소분류 필터링
-  const subcodeMap = { INCOME: '소득유형', EXPENSE: '비용유형', INVEST: '투자유형' };
-  const subcodes = allSubcodes.filter(c => c.codeGroup === (subcodeMap[form.categoryCode] ?? ''));
+  // 선택한 대분류의 말단 항목들
+  const subcodes = form.categoryCode ? leafDescendants(form.categoryCode) : [];
 
-  // 선택한 기관유형에 따라 실제 기관 필터링
+  // 기관 종류 선택 → 해당 기관들
   const [selectedOrgType, setSelectedOrgType] = useState('');
-  const orgTypeMap = { CARD_CO: '카드사', INS_CO: '보험사', BANK: '은행', BROK: '증권사' };
-  const filteredOrgs = selectedOrgType
-    ? allOrgs.filter(o => o.codeGroup === orgTypeMap[selectedOrgType])
-    : allOrgs;
+  const orgs = selectedOrgType ? leafDescendants(selectedOrgType) : [];
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -219,14 +209,14 @@ function TransactionModal({ modal, categories, allSubcodes, orgTypes, allOrgs, o
             <label>대분류</label>
             <select value={form.categoryCode} onChange={e => { set('categoryCode', e.target.value); set('subcategoryCode', ''); }}>
               <option value="">선택</option>
-              {categories.map(c => <option key={c.code} value={c.code}>{c.codeName}</option>)}
+              {categories.map(c => <option key={c.cdId} value={c.cdId}>{c.cdNm}</option>)}
             </select>
           </div>
           <div className="form-group">
             <label>소분류</label>
             <select value={form.subcategoryCode} onChange={e => set('subcategoryCode', e.target.value)} disabled={!form.categoryCode}>
               <option value="">선택</option>
-              {subcodes.map(c => <option key={c.code} value={c.code}>{c.codeName}</option>)}
+              {subcodes.map(c => <option key={c.cdId} value={c.cdId}>{c.cdNm}</option>)}
             </select>
           </div>
           <div className="form-group">
@@ -244,15 +234,15 @@ function TransactionModal({ modal, categories, allSubcodes, orgTypes, allOrgs, o
           <div className="form-group">
             <label>기관 종류</label>
             <select value={selectedOrgType} onChange={e => { setSelectedOrgType(e.target.value); set('orgCode', ''); }}>
-              <option value="">전체</option>
-              {orgTypes.map(o => <option key={o.code} value={o.code}>{o.codeName}</option>)}
+              <option value="">선택</option>
+              {orgTypes.map(o => <option key={o.cdId} value={o.cdId}>{o.cdNm}</option>)}
             </select>
           </div>
           <div className="form-group">
             <label>기관명</label>
-            <select value={form.orgCode || ''} onChange={e => set('orgCode', e.target.value)}>
+            <select value={form.orgCode || ''} onChange={e => set('orgCode', e.target.value)} disabled={!selectedOrgType}>
               <option value="">없음</option>
-              {filteredOrgs.map(o => <option key={o.code} value={o.code}>{o.codeName}</option>)}
+              {orgs.map(o => <option key={o.cdId} value={o.cdId}>{o.cdNm}</option>)}
             </select>
           </div>
           <div className="form-group full">

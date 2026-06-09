@@ -2,27 +2,30 @@ import axios from 'axios';
 
 const api = axios.create({ baseURL: 'http://localhost:8080/api' });
 
-// ── 공통코드 ──────────────────────────────────────
-export const getCodesByGroup = (codeGroup) =>
-  api.get(`/codes/group/${encodeURIComponent(codeGroup)}`).then(r => r.data);
+// ── 공통코드 (TB_CODE) ────────────────────────────
+// 특정 부모의 활성 하위코드
+export const getCodeChildren = (parentCdId) =>
+  api.get(`/codes/children/${parentCdId}`).then(r => r.data);
 
-export const getCodeChildren = (parentId) =>
-  api.get(`/codes/children/${parentId}`).then(r => r.data);
+// 특정 레벨의 활성 코드
+export const getCodesByLevel = (level) =>
+  api.get(`/codes/level/${level}`).then(r => r.data);
 
+// 전체 코드 (삭제 포함)
 export const getAllCodes = () =>
   api.get('/codes').then(r => r.data);
 
 export const createCode = (data) =>
   api.post('/codes', data).then(r => r.data);
 
-export const updateCode = (id, data) =>
-  api.put(`/codes/${id}`, data).then(r => r.data);
+export const updateCode = (cdId, data) =>
+  api.put(`/codes/${cdId}`, data).then(r => r.data);
 
-export const deleteCode = (id) =>
-  api.delete(`/codes/${id}`);
+export const deleteCode = (cdId) =>
+  api.delete(`/codes/${cdId}`);
 
-export const restoreCode = (id) =>
-  api.put(`/codes/${id}/restore`).then(r => r.data);
+export const restoreCode = (cdId) =>
+  api.put(`/codes/${cdId}/restore`).then(r => r.data);
 
 // ── 거래내역 ──────────────────────────────────────
 export const getTransactions = (year, month) =>
