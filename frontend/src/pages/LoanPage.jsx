@@ -278,7 +278,7 @@ function RatesTab({ rates, plans, getRateForMonth, onAdd, onEdit, onDelete }) {
         <h2>이자율 히스토리</h2>
         <button className="btn btn-primary" onClick={onAdd}>+ 이자율 추가</button>
         <span style={{ fontSize: 12, color: '#888', marginLeft: 8 }}>
-          변동 가능 (6개월 단위) · 이자지급일 매달 27일 · 계산식: 잔액 × 연이자율% ÷ 365 × 적용일수
+          변동 가능 (6개월 단위) · 이자지급일 매달 27일 · 계산식: 잔액 × 연이자율% ÷ 12
         </span>
       </div>
 
@@ -390,7 +390,7 @@ function RatesTab({ rates, plans, getRateForMonth, onAdd, onEdit, onDelete }) {
 function PlanModal({ modal, onSave, onClose }) {
   const [form, setForm] = useState(modal.data);
   const [calcLoading, setCalcLoading] = useState(false);
-  const [calcDetail, setCalcDetail] = useState(null); // { days, annualRate }
+  const [calcDetail, setCalcDetail] = useState(null); // { annualRate }
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   // 모달 열릴 때 잔액이 이미 있으면 바로 이자 자동계산
@@ -412,7 +412,7 @@ function PlanModal({ modal, onSave, onClose }) {
           appliedRate: result.annualRate,
           paymentDay: result.paymentDay || 27
         }));
-        setCalcDetail({ days: result.days, annualRate: result.annualRate });
+        setCalcDetail({ annualRate: result.annualRate });
       }
     } finally {
       setCalcLoading(false);
@@ -426,10 +426,10 @@ function PlanModal({ modal, onSave, onClose }) {
 
         <div style={{ background: '#e8eaf6', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 12, color: '#3949ab', lineHeight: 1.6 }}>
           💡 잔액 입력 시 이자 자동 계산 · 이자지급일 매달 <strong>27일</strong><br/>
-          <span style={{ color: '#555' }}>계산식: 잔액 × 연이자율% ÷ 365 × (전달 28일 ~ 이번달 27일 일수)</span>
+          <span style={{ color: '#555' }}>계산식: 잔액 × 연이자율% ÷ 12 (월할)</span>
           {calcDetail && (
             <div style={{ marginTop: 6, color: '#1a237e', fontWeight: 600 }}>
-              → {Number(calcDetail.annualRate).toFixed(2)}% 적용, {calcDetail.days}일
+              → {Number(calcDetail.annualRate).toFixed(2)}% 적용 (월할)
             </div>
           )}
         </div>

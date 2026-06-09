@@ -36,12 +36,10 @@ public class LoanInterestRateController {
         Map<String, Object> result = new HashMap<>();
         loanService.getApplicableRate(year, month).ifPresentOrElse(rate -> {
             long interest = loanService.calculateMonthlyInterest(balance, rate.getAnnualRate(), year, month);
-            long days = loanService.calcDays(year, month);
             result.put("rate", rate);
             result.put("annualRate", rate.getAnnualRate());
             result.put("interestAmount", interest);
             result.put("paymentDay", 27);
-            result.put("days", days);
         }, () -> {
             result.put("rate", null);
             result.put("annualRate", null);
