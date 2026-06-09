@@ -115,7 +115,7 @@ export default function CommonCodesPage() {
               <th>공통코드명</th>
               <th style={{ textAlign: 'center' }}>레벨</th>
               <th style={{ textAlign: 'center' }}>순서</th>
-              <th>상태</th>
+              <th style={{ textAlign: 'center' }}>상태</th>
               <th></th>
             </tr>
           </thead>
@@ -146,7 +146,7 @@ export default function CommonCodesPage() {
                   </td>
                   <td style={{ color: '#999', textAlign: 'center' }}>{c.cdLevel}</td>
                   <td style={{ color: '#999', textAlign: 'center' }}>{c.sortOrder}</td>
-                  <td>
+                  <td style={{ textAlign: 'center' }}>
                     <span style={{
                       padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 600,
                       background: c.delYn === 'N' ? '#e8f5e9' : '#ffebee',
