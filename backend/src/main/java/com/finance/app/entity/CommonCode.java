@@ -6,46 +6,44 @@ import lombok.Setter;
 import lombok.NoArgsConstructor;
 
 /**
- * 공통코드
+ * 공통코드 (TB_CODE)
  *
- * codeGroup 계층 구조:
- *   대분류  (parentId=null) : 소득/비용/투자
- *   소득유형 (parentId=대분류ID) : 급여/이자소득/배당소득
- *   비용유형 (parentId=대분류ID) : 통신비/관리비/보험비/정기구독/카드값/기타
- *   투자유형 (parentId=대분류ID) : 배당투자/퇴직연금
- *   기관유형 (parentId=null) : 카드사/보험사/은행/증권사
- *   카드사   (parentId=기관유형ID) : 삼성카드/현대카드/...
- *   보험사   (parentId=기관유형ID) : 삼성화재/동양생명/...
- *   은행     (parentId=기관유형ID) : 우리은행/신한은행/...
- *   증권사   (parentId=기관유형ID) : 미래에셋/토스/...
+ * 코드체계: CD + 4자리 계층번호
+ *   [대분류][중분류][소분류][예비]
+ *   CD0000 = ROOT (최상위)
+ *   CD1000 = 소득 (L1)
+ *   CD2100 = 고정비용 (L2, parent=CD2000)
+ *   CD2110 = 통신비 (L3, parent=CD2100)
+ *
+ * 계층은 PARENT_CD_ID + CD_LEVEL 로 표현 (자기참조)
  */
 @Entity
-@Table(name = "common_codes")
+@Table(name = "TB_CODE")
 @Getter @Setter @NoArgsConstructor
 public class CommonCode {
 
+    // 공통코드ID (PK, 예: CD0000) — 직접 부여
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @Column(name = "CD_ID", length = 10)
+    private String cdId;
 
-    // 코드 그룹 (대분류 / 소득유형 / 비용유형 / 투자유형 / 기관유형 / 카드사 / 보험사 / 은행 / 증권사)
-    @Column(nullable = false)
-    private String codeGroup;
+    // 공통코드명 (예: 소득)
+    @Column(name = "CD_NM", nullable = false)
+    private String cdNm;
 
-    // 상위 코드 ID (null이면 최상위)
-    private Long parentId;
+    // 코드레벨 (0=ROOT, 1=대분류, 2=중분류, 3=소분류)
+    @Column(name = "CD_LEVEL", nullable = false)
+    private int cdLevel;
 
-    // 코드값 (영문, 그룹 내 유일) — H2 예약어 충돌 방지로 컬럼명 명시
-    @Column(name = "code_val", nullable = false)
-    private String code;
+    // 부모코드ID (null이면 최상위 ROOT)
+    @Column(name = "PARENT_CD_ID", length = 10)
+    private String parentCdId;
 
-    // 화면 표시명
-    @Column(nullable = false)
-    private String codeName;
+    // 정렬순서 (같은 부모 내 순서)
+    @Column(name = "SORT_ORDER")
+    private Integer sortOrder;
 
-    private int sortOrder;
-
-    // 소프트 삭제: N=정상, Y=삭제
-    @Column(nullable = false)
+    // 소프트삭제: N=정상, Y=삭제
+    @Column(name = "DEL_YN", nullable = false, length = 1)
     private String delYn = "N";
 }

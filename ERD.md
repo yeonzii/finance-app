@@ -7,17 +7,16 @@
 
 ```mermaid
 erDiagram
-    COMMON_CODES ||--o{ COMMON_CODES : "parent_id (계층구조)"
-    COMMON_CODES ||..o{ TRANSACTIONS : "코드값 참조 (FK 아님)"
+    TB_CODE ||--o{ TB_CODE : "parent_cd_id (계층구조)"
+    TB_CODE ||..o{ TRANSACTIONS : "코드값 참조 (FK 아님)"
 
-    COMMON_CODES {
-        bigint id PK
-        varchar code_group "대분류/소득유형/카드사 등"
-        bigint parent_id FK "상위코드 (NULL=최상위)"
-        varchar code_val "코드값 (영문, 예:SALARY)"
-        varchar code_name "표시명 (예:급여)"
-        int sort_order "정렬순서"
-        varchar del_yn "소프트삭제 N/Y"
+    TB_CODE {
+        varchar CD_ID PK "공통코드ID (예:CD2110)"
+        varchar CD_NM "공통코드명 (예:통신비)"
+        int CD_LEVEL "코드레벨 (0=ROOT~3=소분류)"
+        varchar PARENT_CD_ID FK "부모코드ID (NULL=ROOT)"
+        int SORT_ORDER "정렬순서"
+        varchar DEL_YN "소프트삭제 N/Y"
     }
 
     TRANSACTIONS {
@@ -75,20 +74,27 @@ erDiagram
 
 ## 테이블 설명
 
-### 1. `common_codes` — 공통코드 (중심 테이블)
+### 1. `TB_CODE` — 공통코드 (중심 테이블)
 모든 분류값을 코드로 관리. **자기참조(self-reference)** 계층 구조.
 
-```
-대분류 (parent_id=NULL)
-├── 소득유형 → 급여 / 이자소득 / 배당소득
-├── 비용유형 → 통신비 / 관리비 / 보험비 / 정기구독 / 카드값 / 기타
-└── 투자유형 → 배당투자 / 퇴직연금
+**코드체계**: `CD` + 4자리 `[대분류][중분류][소분류][예비]`
+- `CD0000` = ROOT (L0)
+- `CD1000` = 소득 (L1) / `CD2100` = 고정비용 (L2) / `CD2110` = 통신비 (L3)
 
-기관유형 (parent_id=NULL)
-├── 카드사 → 삼성카드 / 신한카드 / 현대카드 / 국민카드 / 비씨카드 / 하나카드
-├── 보험사 → 삼성화재 / 현대해상 / 동양생명 / DB손해보험
-├── 은행   → 우리은행 / 신한은행 / 오케이저축은행 / 대신저축은행 / 새마을금고
-└── 증권사 → 미래에셋 / 토스
+```
+CD0000 ROOT
+├── CD1000 소득
+│   ├── CD1100 급여 / CD1200 이자소득 / CD1300 배당소득
+├── CD2000 비용
+│   ├── CD2100 고정비용 → 통신비 / 관리비·세금 / 보험비 / 정기구독
+│   └── CD2200 가변비용 → 카드값 / 기타
+├── CD3000 기관분류
+│   ├── CD3100 카드사 → 삼성/신한/현대/국민/비씨/하나
+│   ├── CD3200 보험사 → 삼성화재/현대해상/동양생명/DB손해보험
+│   ├── CD3300 은행   → 우리/신한/오케이저축/대신저축/새마을금고
+│   └── CD3400 증권사 → 미래에셋/토스
+└── CD4000 투자
+    ├── CD4100 배당투자 / CD4200 퇴직연금
 ```
 
 ### 2. `transactions` — 거래내역
@@ -111,8 +117,8 @@ erDiagram
 
 | 관계 | 방식 | 이유 |
 |------|------|------|
-| `common_codes` → `common_codes` | `parent_id`로 자기참조 | 계층 구조 표현 |
-| `transactions` → `common_codes` | `category_code` 등 **코드값(문자열)** 으로 참조 | 코드 추가/삭제 유연성, 소프트삭제와 궁합 |
+| `TB_CODE` → `TB_CODE` | `PARENT_CD_ID`로 자기참조 | 계층 구조 표현 |
+| `transactions` → `TB_CODE` | `category_code` 등 **코드값(CD_ID)** 으로 참조 | 코드 추가/삭제 유연성, 소프트삭제와 궁합 |
 
 > **장점**: 코드를 소프트삭제(`del_yn='Y'`)해도 기존 거래내역이 깨지지 않음
 > **주의**: DB가 무결성을 강제하지 않으므로, 코드값 존재 검증은 애플리케이션 레이어 책임

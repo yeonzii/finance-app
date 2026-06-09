@@ -1,101 +1,72 @@
 -- ================================================
--- 공통코드 초기 데이터
--- ID 할당 순서:
---   1-3   대분류    (INCOME=1, EXPENSE=2, INVEST=3)
---   4-6   소득유형  (parentId=1)
---   7-12  비용유형  (parentId=2)
---   13-14 투자유형  (parentId=3)
---   15-18 기관유형  (CARD_CO=15, INS_CO=16, BANK=17, BROK=18)
---   19-24 카드사    (parentId=15)
---   25-28 보험사    (parentId=16)
---   29-33 은행      (parentId=17)
---   34-35 증권사    (parentId=18)
+-- 공통코드 초기 데이터 (TB_CODE)
+-- 코드체계: CD + 4자리 [대분류][중분류][소분류][예비]
+--   L0 ROOT       : CD0000
+--   L1 대분류     : CD1000 소득 / CD2000 비용 / CD3000 기관분류 / CD4000 투자
+--   L2 중분류     : CDx100, CDx200 ...
+--   L3 소분류     : CDxy10, CDxy20 ...
 -- ================================================
 
--- 1. 대분류
-INSERT IGNORE INTO common_codes (code_group, parent_id, code_val, code_name, sort_order, del_yn)
-VALUES ('대분류', NULL, 'INCOME',  '소득', 1, 'N');   -- id=1
-INSERT IGNORE INTO common_codes (code_group, parent_id, code_val, code_name, sort_order, del_yn)
-VALUES ('대분류', NULL, 'EXPENSE', '비용', 2, 'N');   -- id=2
-INSERT IGNORE INTO common_codes (code_group, parent_id, code_val, code_name, sort_order, del_yn)
-VALUES ('대분류', NULL, 'INVEST',  '투자', 3, 'N');   -- id=3
+-- L0 ROOT
+INSERT IGNORE INTO tb_code (CD_ID, CD_NM, CD_LEVEL, PARENT_CD_ID, SORT_ORDER, DEL_YN)
+VALUES ('CD0000', 'ROOT', 0, NULL, 0, 'N');
 
--- 2. 소득유형 (parentId=1 = 소득)
-INSERT IGNORE INTO common_codes (code_group, parent_id, code_val, code_name, sort_order, del_yn)
-VALUES ('소득유형', 1, 'SALARY',   '급여',     1, 'N');  -- id=4
-INSERT IGNORE INTO common_codes (code_group, parent_id, code_val, code_name, sort_order, del_yn)
-VALUES ('소득유형', 1, 'INTEREST', '이자소득', 2, 'N');  -- id=5
-INSERT IGNORE INTO common_codes (code_group, parent_id, code_val, code_name, sort_order, del_yn)
-VALUES ('소득유형', 1, 'DIVIDEND', '배당소득', 3, 'N');  -- id=6
+-- ── L1 대분류 ──────────────────────────────────
+INSERT IGNORE INTO tb_code (CD_ID, CD_NM, CD_LEVEL, PARENT_CD_ID, SORT_ORDER, DEL_YN) VALUES ('CD1000', '소득',     1, 'CD0000', 1, 'N');
+INSERT IGNORE INTO tb_code (CD_ID, CD_NM, CD_LEVEL, PARENT_CD_ID, SORT_ORDER, DEL_YN) VALUES ('CD2000', '비용',     1, 'CD0000', 2, 'N');
+INSERT IGNORE INTO tb_code (CD_ID, CD_NM, CD_LEVEL, PARENT_CD_ID, SORT_ORDER, DEL_YN) VALUES ('CD3000', '기관분류', 1, 'CD0000', 3, 'N');
+INSERT IGNORE INTO tb_code (CD_ID, CD_NM, CD_LEVEL, PARENT_CD_ID, SORT_ORDER, DEL_YN) VALUES ('CD4000', '투자',     1, 'CD0000', 4, 'N');
 
--- 3. 비용유형 (parentId=2 = 비용)
-INSERT IGNORE INTO common_codes (code_group, parent_id, code_val, code_name, sort_order, del_yn)
-VALUES ('비용유형', 2, 'COMM',     '통신비',     1, 'N');  -- id=7
-INSERT IGNORE INTO common_codes (code_group, parent_id, code_val, code_name, sort_order, del_yn)
-VALUES ('비용유형', 2, 'MGMT',     '관리비/세금', 2, 'N'); -- id=8
-INSERT IGNORE INTO common_codes (code_group, parent_id, code_val, code_name, sort_order, del_yn)
-VALUES ('비용유형', 2, 'INSUR',    '보험비',     3, 'N');  -- id=9
-INSERT IGNORE INTO common_codes (code_group, parent_id, code_val, code_name, sort_order, del_yn)
-VALUES ('비용유형', 2, 'SUBS',     '정기구독',   4, 'N');  -- id=10
-INSERT IGNORE INTO common_codes (code_group, parent_id, code_val, code_name, sort_order, del_yn)
-VALUES ('비용유형', 2, 'CARD_PAY', '카드값',     5, 'N');  -- id=11
-INSERT IGNORE INTO common_codes (code_group, parent_id, code_val, code_name, sort_order, del_yn)
-VALUES ('비용유형', 2, 'ETC',      '기타',       6, 'N');  -- id=12
+-- ── 소득 (CD1000) L2 ──────────────────────────
+INSERT IGNORE INTO tb_code (CD_ID, CD_NM, CD_LEVEL, PARENT_CD_ID, SORT_ORDER, DEL_YN) VALUES ('CD1100', '급여',     2, 'CD1000', 1, 'N');
+INSERT IGNORE INTO tb_code (CD_ID, CD_NM, CD_LEVEL, PARENT_CD_ID, SORT_ORDER, DEL_YN) VALUES ('CD1200', '이자소득', 2, 'CD1000', 2, 'N');
+INSERT IGNORE INTO tb_code (CD_ID, CD_NM, CD_LEVEL, PARENT_CD_ID, SORT_ORDER, DEL_YN) VALUES ('CD1300', '배당소득', 2, 'CD1000', 3, 'N');
 
--- 4. 투자유형 (parentId=3 = 투자)
-INSERT IGNORE INTO common_codes (code_group, parent_id, code_val, code_name, sort_order, del_yn)
-VALUES ('투자유형', 3, 'DIV_INVEST', '배당투자', 1, 'N'); -- id=13
-INSERT IGNORE INTO common_codes (code_group, parent_id, code_val, code_name, sort_order, del_yn)
-VALUES ('투자유형', 3, 'PENSION',    '퇴직연금', 2, 'N'); -- id=14
+-- ── 비용 (CD2000) L2 ──────────────────────────
+INSERT IGNORE INTO tb_code (CD_ID, CD_NM, CD_LEVEL, PARENT_CD_ID, SORT_ORDER, DEL_YN) VALUES ('CD2100', '고정비용', 2, 'CD2000', 1, 'N');
+INSERT IGNORE INTO tb_code (CD_ID, CD_NM, CD_LEVEL, PARENT_CD_ID, SORT_ORDER, DEL_YN) VALUES ('CD2200', '가변비용', 2, 'CD2000', 2, 'N');
 
--- 5. 기관유형 최상위
-INSERT IGNORE INTO common_codes (code_group, parent_id, code_val, code_name, sort_order, del_yn)
-VALUES ('기관유형', NULL, 'CARD_CO', '카드사', 1, 'N'); -- id=15
-INSERT IGNORE INTO common_codes (code_group, parent_id, code_val, code_name, sort_order, del_yn)
-VALUES ('기관유형', NULL, 'INS_CO',  '보험사', 2, 'N'); -- id=16
-INSERT IGNORE INTO common_codes (code_group, parent_id, code_val, code_name, sort_order, del_yn)
-VALUES ('기관유형', NULL, 'BANK',    '은행',   3, 'N'); -- id=17
-INSERT IGNORE INTO common_codes (code_group, parent_id, code_val, code_name, sort_order, del_yn)
-VALUES ('기관유형', NULL, 'BROK',    '증권사', 4, 'N'); -- id=18
+-- 고정비용 (CD2100) L3
+INSERT IGNORE INTO tb_code (CD_ID, CD_NM, CD_LEVEL, PARENT_CD_ID, SORT_ORDER, DEL_YN) VALUES ('CD2110', '통신비',     3, 'CD2100', 1, 'N');
+INSERT IGNORE INTO tb_code (CD_ID, CD_NM, CD_LEVEL, PARENT_CD_ID, SORT_ORDER, DEL_YN) VALUES ('CD2120', '관리비/세금', 3, 'CD2100', 2, 'N');
+INSERT IGNORE INTO tb_code (CD_ID, CD_NM, CD_LEVEL, PARENT_CD_ID, SORT_ORDER, DEL_YN) VALUES ('CD2130', '보험비',     3, 'CD2100', 3, 'N');
+INSERT IGNORE INTO tb_code (CD_ID, CD_NM, CD_LEVEL, PARENT_CD_ID, SORT_ORDER, DEL_YN) VALUES ('CD2140', '정기구독',   3, 'CD2100', 4, 'N');
 
--- 6. 카드사 (parentId=15 = CARD_CO)
-INSERT IGNORE INTO common_codes (code_group, parent_id, code_val, code_name, sort_order, del_yn)
-VALUES ('카드사', 15, 'SAMSUNG_CARD', '삼성카드', 1, 'N'); -- id=19
-INSERT IGNORE INTO common_codes (code_group, parent_id, code_val, code_name, sort_order, del_yn)
-VALUES ('카드사', 15, 'SHINHAN_CARD', '신한카드', 2, 'N'); -- id=20
-INSERT IGNORE INTO common_codes (code_group, parent_id, code_val, code_name, sort_order, del_yn)
-VALUES ('카드사', 15, 'HYUNDAI_CARD', '현대카드', 3, 'N'); -- id=21
-INSERT IGNORE INTO common_codes (code_group, parent_id, code_val, code_name, sort_order, del_yn)
-VALUES ('카드사', 15, 'KOOKMIN_CARD', '국민카드', 4, 'N'); -- id=22
-INSERT IGNORE INTO common_codes (code_group, parent_id, code_val, code_name, sort_order, del_yn)
-VALUES ('카드사', 15, 'BC_CARD',      '비씨카드', 5, 'N'); -- id=23
-INSERT IGNORE INTO common_codes (code_group, parent_id, code_val, code_name, sort_order, del_yn)
-VALUES ('카드사', 15, 'HANA_CARD',    '하나카드', 6, 'N'); -- id=24
+-- 가변비용 (CD2200) L3
+INSERT IGNORE INTO tb_code (CD_ID, CD_NM, CD_LEVEL, PARENT_CD_ID, SORT_ORDER, DEL_YN) VALUES ('CD2210', '카드값', 3, 'CD2200', 1, 'N');
+INSERT IGNORE INTO tb_code (CD_ID, CD_NM, CD_LEVEL, PARENT_CD_ID, SORT_ORDER, DEL_YN) VALUES ('CD2220', '기타',   3, 'CD2200', 2, 'N');
 
--- 7. 보험사 (parentId=16 = INS_CO)
-INSERT IGNORE INTO common_codes (code_group, parent_id, code_val, code_name, sort_order, del_yn)
-VALUES ('보험사', 16, 'SAMSUNG_FIRE', '삼성화재',   1, 'N'); -- id=25
-INSERT IGNORE INTO common_codes (code_group, parent_id, code_val, code_name, sort_order, del_yn)
-VALUES ('보험사', 16, 'HYUNDAI_INS',  '현대해상',   2, 'N'); -- id=26
-INSERT IGNORE INTO common_codes (code_group, parent_id, code_val, code_name, sort_order, del_yn)
-VALUES ('보험사', 16, 'DONGYANG',     '동양생명',   3, 'N'); -- id=27
-INSERT IGNORE INTO common_codes (code_group, parent_id, code_val, code_name, sort_order, del_yn)
-VALUES ('보험사', 16, 'DB_INS',       'DB손해보험', 4, 'N'); -- id=28
+-- ── 기관분류 (CD3000) L2 ──────────────────────
+INSERT IGNORE INTO tb_code (CD_ID, CD_NM, CD_LEVEL, PARENT_CD_ID, SORT_ORDER, DEL_YN) VALUES ('CD3100', '카드사', 2, 'CD3000', 1, 'N');
+INSERT IGNORE INTO tb_code (CD_ID, CD_NM, CD_LEVEL, PARENT_CD_ID, SORT_ORDER, DEL_YN) VALUES ('CD3200', '보험사', 2, 'CD3000', 2, 'N');
+INSERT IGNORE INTO tb_code (CD_ID, CD_NM, CD_LEVEL, PARENT_CD_ID, SORT_ORDER, DEL_YN) VALUES ('CD3300', '은행',   2, 'CD3000', 3, 'N');
+INSERT IGNORE INTO tb_code (CD_ID, CD_NM, CD_LEVEL, PARENT_CD_ID, SORT_ORDER, DEL_YN) VALUES ('CD3400', '증권사', 2, 'CD3000', 4, 'N');
 
--- 8. 은행 (parentId=17 = BANK)
-INSERT IGNORE INTO common_codes (code_group, parent_id, code_val, code_name, sort_order, del_yn)
-VALUES ('은행', 17, 'WOORI',     '우리은행',       1, 'N'); -- id=29
-INSERT IGNORE INTO common_codes (code_group, parent_id, code_val, code_name, sort_order, del_yn)
-VALUES ('은행', 17, 'SHINHAN',   '신한은행',       2, 'N'); -- id=30
-INSERT IGNORE INTO common_codes (code_group, parent_id, code_val, code_name, sort_order, del_yn)
-VALUES ('은행', 17, 'OKAY_SAVE', '오케이저축은행', 3, 'N'); -- id=31
-INSERT IGNORE INTO common_codes (code_group, parent_id, code_val, code_name, sort_order, del_yn)
-VALUES ('은행', 17, 'DAESHIN',   '대신저축은행',   4, 'N'); -- id=32
-INSERT IGNORE INTO common_codes (code_group, parent_id, code_val, code_name, sort_order, del_yn)
-VALUES ('은행', 17, 'SAEMAUL',   '새마을금고',     5, 'N'); -- id=33
+-- 카드사 (CD3100) L3
+INSERT IGNORE INTO tb_code (CD_ID, CD_NM, CD_LEVEL, PARENT_CD_ID, SORT_ORDER, DEL_YN) VALUES ('CD3110', '삼성카드', 3, 'CD3100', 1, 'N');
+INSERT IGNORE INTO tb_code (CD_ID, CD_NM, CD_LEVEL, PARENT_CD_ID, SORT_ORDER, DEL_YN) VALUES ('CD3120', '신한카드', 3, 'CD3100', 2, 'N');
+INSERT IGNORE INTO tb_code (CD_ID, CD_NM, CD_LEVEL, PARENT_CD_ID, SORT_ORDER, DEL_YN) VALUES ('CD3130', '현대카드', 3, 'CD3100', 3, 'N');
+INSERT IGNORE INTO tb_code (CD_ID, CD_NM, CD_LEVEL, PARENT_CD_ID, SORT_ORDER, DEL_YN) VALUES ('CD3140', '국민카드', 3, 'CD3100', 4, 'N');
+INSERT IGNORE INTO tb_code (CD_ID, CD_NM, CD_LEVEL, PARENT_CD_ID, SORT_ORDER, DEL_YN) VALUES ('CD3150', '비씨카드', 3, 'CD3100', 5, 'N');
+INSERT IGNORE INTO tb_code (CD_ID, CD_NM, CD_LEVEL, PARENT_CD_ID, SORT_ORDER, DEL_YN) VALUES ('CD3160', '하나카드', 3, 'CD3100', 6, 'N');
 
--- 9. 증권사 (parentId=18 = BROK)
-INSERT IGNORE INTO common_codes (code_group, parent_id, code_val, code_name, sort_order, del_yn)
-VALUES ('증권사', 18, 'MIRAE', '미래에셋', 1, 'N'); -- id=34
-INSERT IGNORE INTO common_codes (code_group, parent_id, code_val, code_name, sort_order, del_yn)
-VALUES ('증권사', 18, 'TOSS',  '토스',     2, 'N'); -- id=35
+-- 보험사 (CD3200) L3
+INSERT IGNORE INTO tb_code (CD_ID, CD_NM, CD_LEVEL, PARENT_CD_ID, SORT_ORDER, DEL_YN) VALUES ('CD3210', '삼성화재',   3, 'CD3200', 1, 'N');
+INSERT IGNORE INTO tb_code (CD_ID, CD_NM, CD_LEVEL, PARENT_CD_ID, SORT_ORDER, DEL_YN) VALUES ('CD3220', '현대해상',   3, 'CD3200', 2, 'N');
+INSERT IGNORE INTO tb_code (CD_ID, CD_NM, CD_LEVEL, PARENT_CD_ID, SORT_ORDER, DEL_YN) VALUES ('CD3230', '동양생명',   3, 'CD3200', 3, 'N');
+INSERT IGNORE INTO tb_code (CD_ID, CD_NM, CD_LEVEL, PARENT_CD_ID, SORT_ORDER, DEL_YN) VALUES ('CD3240', 'DB손해보험', 3, 'CD3200', 4, 'N');
+
+-- 은행 (CD3300) L3
+INSERT IGNORE INTO tb_code (CD_ID, CD_NM, CD_LEVEL, PARENT_CD_ID, SORT_ORDER, DEL_YN) VALUES ('CD3310', '우리은행',       3, 'CD3300', 1, 'N');
+INSERT IGNORE INTO tb_code (CD_ID, CD_NM, CD_LEVEL, PARENT_CD_ID, SORT_ORDER, DEL_YN) VALUES ('CD3320', '신한은행',       3, 'CD3300', 2, 'N');
+INSERT IGNORE INTO tb_code (CD_ID, CD_NM, CD_LEVEL, PARENT_CD_ID, SORT_ORDER, DEL_YN) VALUES ('CD3330', '오케이저축은행', 3, 'CD3300', 3, 'N');
+INSERT IGNORE INTO tb_code (CD_ID, CD_NM, CD_LEVEL, PARENT_CD_ID, SORT_ORDER, DEL_YN) VALUES ('CD3340', '대신저축은행',   3, 'CD3300', 4, 'N');
+INSERT IGNORE INTO tb_code (CD_ID, CD_NM, CD_LEVEL, PARENT_CD_ID, SORT_ORDER, DEL_YN) VALUES ('CD3350', '새마을금고',     3, 'CD3300', 5, 'N');
+
+-- 증권사 (CD3400) L3
+INSERT IGNORE INTO tb_code (CD_ID, CD_NM, CD_LEVEL, PARENT_CD_ID, SORT_ORDER, DEL_YN) VALUES ('CD3410', '미래에셋', 3, 'CD3400', 1, 'N');
+INSERT IGNORE INTO tb_code (CD_ID, CD_NM, CD_LEVEL, PARENT_CD_ID, SORT_ORDER, DEL_YN) VALUES ('CD3420', '토스',     3, 'CD3400', 2, 'N');
+
+-- ── 투자 (CD4000) L2 ──────────────────────────
+INSERT IGNORE INTO tb_code (CD_ID, CD_NM, CD_LEVEL, PARENT_CD_ID, SORT_ORDER, DEL_YN) VALUES ('CD4100', '배당투자', 2, 'CD4000', 1, 'N');
+INSERT IGNORE INTO tb_code (CD_ID, CD_NM, CD_LEVEL, PARENT_CD_ID, SORT_ORDER, DEL_YN) VALUES ('CD4200', '퇴직연금', 2, 'CD4000', 2, 'N');

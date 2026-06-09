@@ -15,22 +15,22 @@ public class CommonCodeController {
 
     private final CommonCodeRepository repo;
 
-    // 특정 그룹의 활성 코드 목록 (드롭다운용)
-    @GetMapping("/group/{codeGroup}")
-    public List<CommonCode> getByGroup(@PathVariable String codeGroup) {
-        return repo.findByCodeGroupAndDelYnOrderBySortOrderAsc(codeGroup, "N");
+    // 특정 부모의 활성 하위코드 목록 (드롭다운/계층 탐색용)
+    @GetMapping("/children/{parentCdId}")
+    public List<CommonCode> getChildren(@PathVariable String parentCdId) {
+        return repo.findByParentCdIdAndDelYnOrderBySortOrderAsc(parentCdId, "N");
     }
 
-    // 상위 ID 기준 활성 코드 목록 (기관 하위 항목용)
-    @GetMapping("/children/{parentId}")
-    public List<CommonCode> getChildren(@PathVariable Long parentId) {
-        return repo.findByParentIdAndDelYnOrderBySortOrderAsc(parentId, "N");
+    // 특정 레벨의 활성 코드 목록
+    @GetMapping("/level/{level}")
+    public List<CommonCode> getByLevel(@PathVariable int level) {
+        return repo.findByCdLevelAndDelYnOrderBySortOrderAsc(level, "N");
     }
 
     // 전체 목록 (관리 화면용, 삭제된 항목 포함)
     @GetMapping
     public List<CommonCode> getAll() {
-        return repo.findAll();
+        return repo.findAllByOrderByCdIdAsc();
     }
 
     // 추가
@@ -41,25 +41,25 @@ public class CommonCodeController {
     }
 
     // 수정
-    @PutMapping("/{id}")
-    public CommonCode update(@PathVariable Long id, @RequestBody CommonCode c) {
-        c.setId(id);
+    @PutMapping("/{cdId}")
+    public CommonCode update(@PathVariable String cdId, @RequestBody CommonCode c) {
+        c.setCdId(cdId);
         return repo.save(c);
     }
 
     // 소프트 삭제
-    @DeleteMapping("/{id}")
-    public void softDelete(@PathVariable Long id) {
-        repo.findById(id).ifPresent(c -> {
+    @DeleteMapping("/{cdId}")
+    public void softDelete(@PathVariable String cdId) {
+        repo.findById(cdId).ifPresent(c -> {
             c.setDelYn("Y");
             repo.save(c);
         });
     }
 
     // 복구
-    @PutMapping("/{id}/restore")
-    public CommonCode restore(@PathVariable Long id) {
-        CommonCode c = repo.findById(id).orElseThrow();
+    @PutMapping("/{cdId}/restore")
+    public CommonCode restore(@PathVariable String cdId) {
+        CommonCode c = repo.findById(cdId).orElseThrow();
         c.setDelYn("N");
         return repo.save(c);
     }
