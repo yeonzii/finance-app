@@ -113,8 +113,8 @@ export default function CommonCodesPage() {
             <tr>
               <th>공통코드ID</th>
               <th>공통코드명</th>
-              <th>레벨</th>
-              <th>순서</th>
+              <th style={{ textAlign: 'center' }}>레벨</th>
+              <th style={{ textAlign: 'center' }}>순서</th>
               <th>상태</th>
               <th></th>
             </tr>
