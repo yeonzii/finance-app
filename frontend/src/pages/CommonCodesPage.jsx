@@ -1,42 +1,47 @@
 import { useState, useEffect } from 'react';
 import { getAllCodes, createCode, updateCode, deleteCode, restoreCode } from '../api';
 
+const ROOT = 'CD0000';
 const EMPTY = { cdId: '', cdNm: '', cdLevel: 1, parentCdId: '', sortOrder: 1, delYn: 'N' };
-
-// 계층 정렬: 부모 바로 아래 자식이 오도록 트리 평탄화
-function buildTree(codes, showDeleted) {
-  const visible = codes.filter(c => showDeleted || c.delYn === 'N');
-  const byParent = {};
-  visible.forEach(c => {
-    const key = c.parentCdId || '__root__';
-    (byParent[key] = byParent[key] || []).push(c);
-  });
-  Object.values(byParent).forEach(arr =>
-    arr.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
-  );
-  const result = [];
-  const walk = (parentKey) => {
-    (byParent[parentKey] || []).forEach(c => {
-      result.push(c);
-      walk(c.cdId);
-    });
-  };
-  walk('__root__');
-  return result;
-}
 
 export default function CommonCodesPage() {
   const [allCodes, setAllCodes] = useState([]);
   const [modal, setModal] = useState(null);
   const [showDeleted, setShowDeleted] = useState(false);
+  // 현재 탐색 중인 부모코드 (ROOT면 레벨1이 보임)
+  const [currentParent, setCurrentParent] = useState(ROOT);
 
   const load = () => getAllCodes().then(setAllCodes);
   useEffect(() => { load(); }, []);
 
-  const tree = buildTree(allCodes, showDeleted);
+  // 현재 부모의 직속 하위코드만 (정렬)
+  const rows = allCodes
+    .filter(c => c.parentCdId === currentParent && (showDeleted || c.delYn === 'N'))
+    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+
+  // 자식 보유 여부 (더블클릭 가능한지)
+  const hasChildren = (cdId) => allCodes.some(c => c.parentCdId === cdId && c.delYn === 'N');
+
+  // 브레드크럼 경로 (ROOT 제외)
+  const breadcrumb = [];
+  let cur = currentParent;
+  while (cur && cur !== ROOT) {
+    const node = allCodes.find(c => c.cdId === cur);
+    if (!node) break;
+    breadcrumb.unshift(node);
+    cur = node.parentCdId;
+  }
+
   const parentOptions = allCodes.filter(c => c.delYn === 'N');
 
-  const openAdd = () => setModal({ mode: 'add', data: { ...EMPTY } });
+  const drillInto = (c) => { if (hasChildren(c.cdId)) setCurrentParent(c.cdId); };
+
+  // 추가 시 현재 위치를 부모로 기본 세팅
+  const openAdd = () => {
+    const parentNode = allCodes.find(c => c.cdId === currentParent);
+    const level = currentParent === ROOT ? 1 : (parentNode?.cdLevel ?? 0) + 1;
+    setModal({ mode: 'add', data: { ...EMPTY, parentCdId: currentParent === ROOT ? '' : currentParent, cdLevel: level } });
+  };
   const openEdit = (row) => setModal({ mode: 'edit', data: { ...row } });
   const closeModal = () => setModal(null);
 
@@ -75,6 +80,33 @@ export default function CommonCodesPage() {
         </label>
       </div>
 
+      {/* 브레드크럼 */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12, fontSize: 14, flexWrap: 'wrap' }}>
+        <button
+          className="btn"
+          style={{ background: currentParent === ROOT ? '#3949ab' : '#e8eaf6', color: currentParent === ROOT ? '#fff' : '#3949ab', padding: '4px 12px' }}
+          onClick={() => setCurrentParent(ROOT)}
+        >
+          🏠 전체
+        </button>
+        {breadcrumb.map((node, i) => (
+          <span key={node.cdId} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ color: '#bbb' }}>›</span>
+            <button
+              className="btn"
+              style={{ background: i === breadcrumb.length - 1 ? '#3949ab' : '#e8eaf6', color: i === breadcrumb.length - 1 ? '#fff' : '#3949ab', padding: '4px 12px' }}
+              onClick={() => setCurrentParent(node.cdId)}
+            >
+              {node.cdNm}
+            </button>
+          </span>
+        ))}
+      </div>
+
+      <div style={{ fontSize: 12, color: '#888', marginBottom: 8 }}>
+        💡 하위 코드가 있는 행을 <b>더블클릭</b>하면 하위 레벨로 이동해요.
+      </div>
+
       <div className="table-wrap">
         <table>
           <thead>
@@ -82,33 +114,37 @@ export default function CommonCodesPage() {
               <th>공통코드ID</th>
               <th>공통코드명</th>
               <th>레벨</th>
-              <th>부모코드</th>
               <th>순서</th>
               <th>상태</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
-            {tree.length === 0 && (
-              <tr><td colSpan={7} className="empty-state">코드가 없어요. 추가해보세요.</td></tr>
+            {rows.length === 0 && (
+              <tr><td colSpan={6} className="empty-state">하위 코드가 없어요. 추가해보세요.</td></tr>
             )}
-            {tree.map(c => {
-              const parent = allCodes.find(p => p.cdId === c.parentCdId);
+            {rows.map(c => {
+              const drillable = hasChildren(c.cdId);
               return (
-                <tr key={c.cdId} style={c.delYn === 'Y' ? { opacity: 0.4 } : {}}>
+                <tr
+                  key={c.cdId}
+                  onDoubleClick={() => drillInto(c)}
+                  style={{
+                    opacity: c.delYn === 'Y' ? 0.4 : 1,
+                    cursor: drillable ? 'pointer' : 'default',
+                  }}
+                  title={drillable ? '더블클릭하면 하위 코드를 봅니다' : ''}
+                >
                   <td>
                     <code style={{ background: '#e8eaf6', padding: '2px 6px', borderRadius: 4, fontSize: 12 }}>
                       {c.cdId}
                     </code>
                   </td>
-                  <td style={{ fontWeight: 600, paddingLeft: 12 + c.cdLevel * 16 }}>
-                    {c.cdLevel > 0 && <span style={{ color: '#bbb', marginRight: 4 }}>└</span>}
+                  <td style={{ fontWeight: 600 }}>
                     {c.cdNm}
+                    {drillable && <span style={{ color: '#3949ab', marginLeft: 6, fontSize: 12 }}>▸ 하위</span>}
                   </td>
                   <td style={{ color: '#999', textAlign: 'center' }}>{c.cdLevel}</td>
-                  <td style={{ color: '#666', fontSize: 12 }}>
-                    {parent ? `${parent.cdNm} (${parent.cdId})` : '-'}
-                  </td>
                   <td style={{ color: '#999', textAlign: 'center' }}>{c.sortOrder}</td>
                   <td>
                     <span style={{
