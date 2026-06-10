@@ -36,6 +36,9 @@ public class CommonCodeController {
     // 추가
     @PostMapping
     public CommonCode create(@RequestBody CommonCode c) {
+        if (c.getCdId() == null || c.getCdId().isBlank()) {
+            throw new IllegalArgumentException("공통코드ID는 비어 있을 수 없습니다.");
+        }
         c.setDelYn("N");
         return repo.save(c);
     }
