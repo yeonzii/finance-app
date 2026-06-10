@@ -2,7 +2,26 @@ import { useState, useEffect } from 'react';
 import { getAllCodes, createCode, updateCode, deleteCode, restoreCode } from '../api';
 
 const ROOT = 'CD0000';
-const EMPTY = { cdId: '', cdNm: '', cdLevel: 1, parentCdId: '', sortOrder: 1, delYn: 'N' };
+
+// 부모 코드 기준 다음 자식 코드ID 자동 채번
+// 코드체계: CD + 4자리, 부모 레벨 위치의 자리값을 증가시킨다.
+//   ROOT(L0)→1번째자리, L1→2번째, L2→3번째, L3→4번째
+function nextChildCode(parentCdId, parentLevel, allCodes) {
+  const position = parentLevel; // 0~3 (채울 자리 인덱스)
+  if (position > 3) return ''; // 4자리 초과(레벨5+)는 자동채번 불가
+
+  const base = parentCdId.replace(/^CD/, '').padStart(4, '0').split('').map(Number);
+  const siblings = allCodes.filter(c => c.parentCdId === parentCdId); // 삭제 포함 (PK 충돌 방지)
+  let max = 0;
+  siblings.forEach(c => {
+    const d = Number(c.cdId.replace(/^CD/, '').padStart(4, '0')[position]);
+    if (d > max) max = d;
+  });
+  const digits = [...base];
+  digits[position] = max + 1;
+  for (let i = position + 1; i < 4; i++) digits[i] = 0;
+  return 'CD' + digits.join('');
+}
 
 export default function CommonCodesPage() {
   const [allCodes, setAllCodes] = useState([]);
@@ -19,8 +38,12 @@ export default function CommonCodesPage() {
     .filter(c => c.parentCdId === currentParent && (showDeleted || c.delYn === 'N'))
     .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
 
-  // 자식 보유 여부 (더블클릭 가능한지)
   const hasChildren = (cdId) => allCodes.some(c => c.parentCdId === cdId && c.delYn === 'N');
+
+  // 현재 부모 노드 (ROOT면 가상 노드)
+  const currentNode = currentParent === ROOT
+    ? { cdId: ROOT, cdNm: 'ROOT', cdLevel: 0 }
+    : allCodes.find(c => c.cdId === currentParent);
 
   // 브레드크럼 경로 (ROOT 제외)
   const breadcrumb = [];
@@ -32,17 +55,25 @@ export default function CommonCodesPage() {
     cur = node.parentCdId;
   }
 
-  const parentOptions = allCodes.filter(c => c.delYn === 'N');
+  // 더블클릭: 하위 유무와 상관없이 진입 (빈 목록이면 추가 가능)
+  const drillInto = (c) => setCurrentParent(c.cdId);
 
-  const drillInto = (c) => { if (hasChildren(c.cdId)) setCurrentParent(c.cdId); };
-
-  // 추가 시 현재 위치를 부모로 기본 세팅
+  // 추가: 현재 페이지의 하위코드로 추가 (ID 자동 채번)
   const openAdd = () => {
-    const parentNode = allCodes.find(c => c.cdId === currentParent);
-    const level = currentParent === ROOT ? 1 : (parentNode?.cdLevel ?? 0) + 1;
-    setModal({ mode: 'add', data: { ...EMPTY, parentCdId: currentParent === ROOT ? '' : currentParent, cdLevel: level } });
+    const parentLevel = currentNode?.cdLevel ?? 0;
+    const newId = nextChildCode(currentParent, parentLevel, allCodes);
+    const siblings = allCodes.filter(c => c.parentCdId === currentParent && c.delYn === 'N');
+    const nextSort = siblings.reduce((m, c) => Math.max(m, c.sortOrder ?? 0), 0) + 1;
+    setModal({
+      mode: 'add',
+      data: { cdId: newId, cdNm: '', cdLevel: parentLevel + 1, parentCdId: currentParent, sortOrder: nextSort, delYn: 'N' },
+      parentName: currentNode?.cdNm ?? 'ROOT',
+    });
   };
-  const openEdit = (row) => setModal({ mode: 'edit', data: { ...row } });
+  const openEdit = (row) => {
+    const parent = allCodes.find(c => c.cdId === row.parentCdId);
+    setModal({ mode: 'edit', data: { ...row }, parentName: parent?.cdNm ?? 'ROOT' });
+  };
   const closeModal = () => setModal(null);
 
   const handleSave = async (data) => {
@@ -73,7 +104,7 @@ export default function CommonCodesPage() {
     <div>
       <div className="page-header">
         <h2>공통코드 관리</h2>
-        <button className="btn btn-primary" onClick={openAdd}>+ 코드 추가</button>
+        <button className="btn btn-primary" onClick={openAdd}>+ 하위코드 추가</button>
         <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, marginLeft: 'auto' }}>
           <input type="checkbox" checked={showDeleted} onChange={e => setShowDeleted(e.target.checked)} />
           삭제된 항목 보기
@@ -104,7 +135,7 @@ export default function CommonCodesPage() {
       </div>
 
       <div style={{ fontSize: 12, color: '#888', marginBottom: 8 }}>
-        💡 하위 코드가 있는 행을 <b>더블클릭</b>하면 하위 레벨로 이동해요.
+        💡 행을 <b>더블클릭</b>하면 하위 코드로 이동해요 (하위가 없어도 진입해서 추가 가능). <b>+ 하위코드 추가</b>는 현재 위치의 하위로 등록돼요.
       </div>
 
       <div className="table-wrap">
@@ -121,7 +152,7 @@ export default function CommonCodesPage() {
           </thead>
           <tbody>
             {rows.length === 0 && (
-              <tr><td colSpan={6} className="empty-state">하위 코드가 없어요. 추가해보세요.</td></tr>
+              <tr><td colSpan={6} className="empty-state">하위 코드가 없어요. <b>+ 하위코드 추가</b>로 등록해보세요.</td></tr>
             )}
             {rows.map(c => {
               const drillable = hasChildren(c.cdId);
@@ -129,11 +160,8 @@ export default function CommonCodesPage() {
                 <tr
                   key={c.cdId}
                   onDoubleClick={() => drillInto(c)}
-                  style={{
-                    opacity: c.delYn === 'Y' ? 0.4 : 1,
-                    cursor: drillable ? 'pointer' : 'default',
-                  }}
-                  title={drillable ? '더블클릭하면 하위 코드를 봅니다' : ''}
+                  style={{ opacity: c.delYn === 'Y' ? 0.4 : 1, cursor: 'pointer' }}
+                  title="더블클릭하면 하위 코드를 봅니다"
                 >
                   <td>
                     <code style={{ background: '#e8eaf6', padding: '2px 6px', borderRadius: 4, fontSize: 12 }}>
@@ -174,51 +202,31 @@ export default function CommonCodesPage() {
       </div>
 
       {modal && (
-        <CodeModal
-          modal={modal}
-          parentOptions={parentOptions}
-          onSave={handleSave}
-          onClose={closeModal}
-        />
+        <CodeModal modal={modal} onSave={handleSave} onClose={closeModal} />
       )}
     </div>
   );
 }
 
-function CodeModal({ modal, parentOptions, onSave, onClose }) {
+function CodeModal({ modal, onSave, onClose }) {
   const [form, setForm] = useState(modal.data);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={e => e.stopPropagation()}>
-        <h3>{modal.mode === 'add' ? '코드 추가' : '코드 수정'}</h3>
+        <h3>{modal.mode === 'add' ? '하위코드 추가' : '코드 수정'}</h3>
+        <div style={{ background: '#e8eaf6', borderRadius: 8, padding: '8px 12px', marginBottom: 14, fontSize: 12, color: '#3949ab' }}>
+          상위: <strong>{modal.parentName}</strong> · 레벨 <strong>{form.cdLevel}</strong> · 코드ID 자동부여
+        </div>
         <div className="form-grid">
           <div className="form-group">
-            <label>공통코드ID</label>
-            <input
-              value={form.cdId}
-              onChange={e => set('cdId', e.target.value.toUpperCase())}
-              placeholder="예: CD2150"
-              disabled={modal.mode === 'edit'}
-            />
+            <label>공통코드ID (자동)</label>
+            <input value={form.cdId} disabled />
           </div>
           <div className="form-group">
             <label>공통코드명</label>
-            <input value={form.cdNm} onChange={e => set('cdNm', e.target.value)} placeholder="예: 교통비" />
-          </div>
-          <div className="form-group">
-            <label>코드레벨</label>
-            <input type="number" min={0} max={4} value={form.cdLevel} onChange={e => set('cdLevel', +e.target.value)} />
-          </div>
-          <div className="form-group">
-            <label>부모코드 (없으면 ROOT)</label>
-            <select value={form.parentCdId || ''} onChange={e => set('parentCdId', e.target.value || null)}>
-              <option value="">없음</option>
-              {parentOptions.map(p => (
-                <option key={p.cdId} value={p.cdId}>{p.cdNm} ({p.cdId})</option>
-              ))}
-            </select>
+            <input value={form.cdNm} onChange={e => set('cdNm', e.target.value)} placeholder="예: 넷플릭스" autoFocus />
           </div>
           <div className="form-group">
             <label>정렬순서</label>
@@ -227,7 +235,7 @@ function CodeModal({ modal, parentOptions, onSave, onClose }) {
         </div>
         <div className="modal-actions">
           <button className="btn btn-cancel" onClick={onClose}>취소</button>
-          <button className="btn btn-primary" onClick={() => onSave(form)}>저장</button>
+          <button className="btn btn-primary" onClick={() => onSave(form)} disabled={!form.cdId || !form.cdNm}>저장</button>
         </div>
       </div>
     </div>
