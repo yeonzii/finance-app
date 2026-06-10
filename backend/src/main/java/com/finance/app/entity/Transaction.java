@@ -40,6 +40,9 @@ public class Transaction {
 
     private String note;
 
+    // 고정비에서 자동 생성된 거래면 원본 고정비 ID (수동 거래는 null)
+    private Long fixedCostId;
+
     // 소프트 삭제: N=정상, Y=삭제
     @Column(nullable = false)
     private String delYn = "N";

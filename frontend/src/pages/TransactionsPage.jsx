@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   getTransactions, createTransaction, updateTransaction, deleteTransaction,
-  getAllCodes
+  getAllCodes, generateFixedCosts
 } from '../api';
 
 const fmt = (n) => n != null ? Number(n).toLocaleString('ko-KR') : '-';
@@ -55,7 +55,15 @@ export default function TransactionsPage() {
   const orgTypes = childrenOf(ORG_ROOT);
 
   const load = useCallback(() => getTransactions(year, month).then(setRows), [year, month]);
-  useEffect(() => { load(); }, [load]);
+
+  // 월 변경 시: 고정비 자동 생성(중복 방지) 후 목록 로드
+  useEffect(() => {
+    let cancelled = false;
+    generateFixedCosts(year, month)
+      .catch(() => {})
+      .then(() => { if (!cancelled) load(); });
+    return () => { cancelled = true; };
+  }, [year, month, load]);
 
   const openAdd  = () => setModal({ mode: 'add',  data: { ...EMPTY_FORM, year, month } });
   const openEdit = (row) => setModal({ mode: 'edit', data: { ...row } });

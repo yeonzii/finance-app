@@ -12,4 +12,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
 
     List<Transaction> findByYearAndDelYnOrderByMonthAscCategoryCodeAscIdAsc(
             int year, String delYn);
+
+    // 특정 월에 이미 생성된 고정비 거래 (삭제 포함, 중복 생성 방지용)
+    List<Transaction> findByYearAndMonthAndFixedCostIdIsNotNull(int year, int month);
 }

@@ -40,6 +40,23 @@ export const updateTransaction = (id, data) =>
 export const deleteTransaction = (id) =>
   api.delete(`/transactions/${id}`);
 
+// ── 고정비 ────────────────────────────────────────
+export const getFixedCosts = () =>
+  api.get('/fixed-costs').then(r => r.data);
+
+export const createFixedCost = (data) =>
+  api.post('/fixed-costs', data).then(r => r.data);
+
+export const updateFixedCost = (id, data) =>
+  api.put(`/fixed-costs/${id}`, data).then(r => r.data);
+
+export const deleteFixedCost = (id) =>
+  api.delete(`/fixed-costs/${id}`);
+
+// 해당 월에 고정비를 거래로 자동 생성 (중복 방지)
+export const generateFixedCosts = (year, month) =>
+  api.post('/fixed-costs/generate', null, { params: { year, month } }).then(r => r.data);
+
 // ── 자산현황 ──────────────────────────────────────
 export const getAssets = (year) =>
   api.get('/assets', { params: { year } }).then(r => r.data);
