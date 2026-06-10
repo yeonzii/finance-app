@@ -31,7 +31,7 @@ public class CommonCode {
     @Column(name = "CD_NM", nullable = false)
     private String cdNm;
 
-    // 코드레벨 (0=ROOT, 1=대분류, 2=중분류, 3=소분류)
+    // 코드레벨 (0=ROOT, 1=대분류, 2=중분류, 3=소분류, 4=세부항목)
     @Column(name = "CD_LEVEL", nullable = false)
     private int cdLevel;
 

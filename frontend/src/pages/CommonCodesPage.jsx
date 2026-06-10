@@ -209,7 +209,7 @@ function CodeModal({ modal, parentOptions, onSave, onClose }) {
           </div>
           <div className="form-group">
             <label>코드레벨</label>
-            <input type="number" min={0} max={3} value={form.cdLevel} onChange={e => set('cdLevel', +e.target.value)} />
+            <input type="number" min={0} max={4} value={form.cdLevel} onChange={e => set('cdLevel', +e.target.value)} />
           </div>
           <div className="form-group">
             <label>부모코드 (없으면 ROOT)</label>
