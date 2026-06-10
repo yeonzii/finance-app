@@ -6,13 +6,15 @@ import lombok.Setter;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "transactions")
+@Table(name = "TB_TRANSACTION")
 @Getter @Setter @NoArgsConstructor
 public class Transaction {
 
+    // 거래 ID: "TR" + 년 + 월(2자리) + 소분류 코드숫자(CD 제외)
+    // 예: 2026년 6월, CD2141 → TR2026062141
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @Column(name = "id", length = 20)
+    private String id;
 
     @Column(name = "tx_year", nullable = false)
     private int year;
@@ -20,12 +22,10 @@ public class Transaction {
     @Column(name = "tx_month", nullable = false)
     private int month;
 
-    // 대분류 코드 (common_codes.code where codeGroup='대분류')
-    // 예: INCOME / EXPENSE / INVEST
+    // 대분류 코드 (TB_CODE.CD_ID, 예: CD2000 비용)
     private String categoryCode;
 
-    // 소분류 코드 (common_codes.code where codeGroup IN 소득유형/비용유형/투자유형)
-    // 예: SALARY / COMM / DIV_INVEST
+    // 소분류(말단) 코드 (TB_CODE.CD_ID, 예: CD2141)
     private String subcategoryCode;
 
     private Long amount;

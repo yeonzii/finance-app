@@ -4,7 +4,7 @@ import com.finance.app.entity.Transaction;
 import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
-public interface TransactionRepository extends JpaRepository<Transaction, Long> {
+public interface TransactionRepository extends JpaRepository<Transaction, String> {
 
     // 소프트삭제(N) 항목만 조회
     List<Transaction> findByYearAndMonthAndDelYnOrderByCategoryCodeAscIdAsc(

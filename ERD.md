@@ -8,9 +8,9 @@
 ```mermaid
 erDiagram
     TB_CODE ||--o{ TB_CODE : "parent_cd_id (계층구조)"
-    TB_CODE ||..o{ TRANSACTIONS : "코드값 참조 (FK 아님)"
+    TB_CODE ||..o{ TB_TRANSACTION : "코드값 참조 (FK 아님)"
     TB_CODE ||..o{ FIXED_COSTS : "코드값 참조 (FK 아님)"
-    FIXED_COSTS ||..o{ TRANSACTIONS : "fixed_cost_id (자동생성 추적)"
+    FIXED_COSTS ||..o{ TB_TRANSACTION : "fixed_cost_id (자동생성 추적)"
 
     TB_CODE {
         varchar CD_ID PK "공통코드ID (예:CD2110)"
@@ -21,8 +21,8 @@ erDiagram
         varchar DEL_YN "소프트삭제 N/Y"
     }
 
-    TRANSACTIONS {
-        bigint id PK
+    TB_TRANSACTION {
+        varchar id PK "TR+년+월+코드숫자 (예:TR2026062143)"
         int tx_year "년"
         int tx_month "월"
         varchar category_code "대분류 코드값"
@@ -112,7 +112,7 @@ CD0000 ROOT
     ├── CD4100 배당투자 / CD4200 퇴직연금
 ```
 
-### 2. `transactions` — 거래내역
+### 2. `TB_TRANSACTION` — 거래내역
 월별 소득/지출 내역. 분류·기관을 **코드값(문자열)** 으로 참조.
 `fixed_cost_id`가 있으면 고정비에서 자동 생성된 거래 (수동 입력은 NULL).
 
@@ -138,8 +138,8 @@ CD0000 ROOT
 | 관계 | 방식 | 이유 |
 |------|------|------|
 | `TB_CODE` → `TB_CODE` | `PARENT_CD_ID`로 자기참조 | 계층 구조 표현 |
-| `transactions` → `TB_CODE` | `category_code` 등 **코드값(CD_ID)** 으로 참조 | 코드 추가/삭제 유연성, 소프트삭제와 궁합 |
-| `transactions` → `fixed_costs` | `fixed_cost_id`로 출처 추적 | 월별 중복 생성 방지, 자동 생성 거래 식별 |
+| `TB_TRANSACTION` → `TB_CODE` | `category_code` 등 **코드값(CD_ID)** 으로 참조 | 코드 추가/삭제 유연성, 소프트삭제와 궁합 |
+| `TB_TRANSACTION` → `fixed_costs` | `fixed_cost_id`로 출처 추적 | 월별 중복 생성 방지, 자동 생성 거래 식별 |
 
 > **장점**: 코드를 소프트삭제(`del_yn='Y'`)해도 기존 거래내역이 깨지지 않음
 > **주의**: DB가 무결성을 강제하지 않으므로, 코드값 존재 검증은 애플리케이션 레이어 책임

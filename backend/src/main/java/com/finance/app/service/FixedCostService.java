@@ -20,6 +20,7 @@ public class FixedCostService {
     private final FixedCostRepository fixedCostRepo;
     private final TransactionRepository txRepo;
     private final CommonCodeRepository codeRepo;
+    private final TransactionService txService;
 
     /**
      * 해당 월에 등록된 고정비를 거래로 자동 생성 (중복 방지).
@@ -48,6 +49,7 @@ public class FixedCostService {
             t.setNote(fc.getItemName());
             t.setFixedCostId(fc.getId());
             t.setDelYn("N");
+            t.setId(txService.generateId(t));
             txRepo.save(t);
             created++;
         }
