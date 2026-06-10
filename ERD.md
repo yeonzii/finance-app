@@ -9,6 +9,8 @@
 erDiagram
     TB_CODE ||--o{ TB_CODE : "parent_cd_id (계층구조)"
     TB_CODE ||..o{ TRANSACTIONS : "코드값 참조 (FK 아님)"
+    TB_CODE ||..o{ FIXED_COSTS : "코드값 참조 (FK 아님)"
+    FIXED_COSTS ||..o{ TRANSACTIONS : "fixed_cost_id (자동생성 추적)"
 
     TB_CODE {
         varchar CD_ID PK "공통코드ID (예:CD2110)"
@@ -29,6 +31,19 @@ erDiagram
         int transaction_day "거래일"
         int billing_day "청구일"
         varchar org_code "기관 코드값"
+        varchar note "메모"
+        bigint fixed_cost_id "고정비 자동생성 출처 (수동=NULL)"
+        varchar del_yn "소프트삭제 N/Y"
+    }
+
+    FIXED_COSTS {
+        bigint id PK
+        varchar subcategory_code "고정비용 하위 분류 코드값"
+        varchar item_name "항목명 (예:SKT 휴대폰)"
+        bigint amount "기본 월 금액"
+        varchar org_code "기관 코드값"
+        int transaction_day "거래일"
+        int billing_day "청구일"
         varchar note "메모"
         varchar del_yn "소프트삭제 N/Y"
     }
@@ -99,14 +114,19 @@ CD0000 ROOT
 
 ### 2. `transactions` — 거래내역
 월별 소득/지출 내역. 분류·기관을 **코드값(문자열)** 으로 참조.
+`fixed_cost_id`가 있으면 고정비에서 자동 생성된 거래 (수동 입력은 NULL).
 
-### 3. `asset_snapshots` — 월별 자산 스냅샷
+### 3. `fixed_costs` — 고정비 템플릿
+매달 반복되는 고정비 항목. 소득/지출 내역에서 해당 월 진입 시 거래로 자동 생성됨.
+`(fixed_cost_id, tx_year, tx_month)` 기준으로 중복 생성 방지.
+
+### 4. `asset_snapshots` — 월별 자산 스냅샷
 `(tx_year, tx_month)` 복합 유니크. 월별 자산 현황 한 행.
 
-### 4. `loan_plans` — 대출 월별 상환계획
+### 5. `loan_plans` — 대출 월별 상환계획
 `applied_rate`에 그 달 적용 이자율을 **스냅샷처럼 보존** (이자율이 나중에 바뀌어도 과거 기록 유지).
 
-### 5. `loan_interest_rates` — 이자율 히스토리
+### 6. `loan_interest_rates` — 이자율 히스토리
 구간(`start ~ end`)별 연이자율. `end`가 NULL이면 현재까지 유효.
 
 ---
@@ -119,6 +139,7 @@ CD0000 ROOT
 |------|------|------|
 | `TB_CODE` → `TB_CODE` | `PARENT_CD_ID`로 자기참조 | 계층 구조 표현 |
 | `transactions` → `TB_CODE` | `category_code` 등 **코드값(CD_ID)** 으로 참조 | 코드 추가/삭제 유연성, 소프트삭제와 궁합 |
+| `transactions` → `fixed_costs` | `fixed_cost_id`로 출처 추적 | 월별 중복 생성 방지, 자동 생성 거래 식별 |
 
 > **장점**: 코드를 소프트삭제(`del_yn='Y'`)해도 기존 거래내역이 깨지지 않음
 > **주의**: DB가 무결성을 강제하지 않으므로, 코드값 존재 검증은 애플리케이션 레이어 책임
