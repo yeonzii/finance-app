@@ -4,13 +4,14 @@ import {
 } from '../api';
 
 const INCOME_ROOT = 'CD1000'; // 소득
+const EXPENSE_ROOT = 'CD2000'; // 비용
 const ORG_ROOT = 'CD3000';    // 기관분류
 
 // 구분별 설정: 라벨 + 항목 선택 소스(공통코드 루트)
 const TYPES = [
-  { key: 'INCOME',  label: '소득', root: INCOME_ROOT, color: '#2e7d32', bg: '#e8f5e9' },
-  { key: 'EXPENSE', label: '지출', root: ORG_ROOT,    color: '#c62828', bg: '#ffebee' },
-  { key: 'ASSET',   label: '자산', root: ORG_ROOT,    color: '#283593', bg: '#e8eaf6' },
+  { key: 'INCOME',  label: '소득', root: INCOME_ROOT,  codeLabel: '소득 코드',     color: '#2e7d32', bg: '#e8f5e9' },
+  { key: 'EXPENSE', label: '지출', root: EXPENSE_ROOT, codeLabel: '비용 코드',     color: '#c62828', bg: '#ffebee' },
+  { key: 'ASSET',   label: '자산', root: ORG_ROOT,     codeLabel: '기관분류 코드', color: '#283593', bg: '#e8eaf6' },
 ];
 
 export default function AssetItemsPage() {
@@ -128,7 +129,7 @@ function AddItemModal({ type, leaves, parentName, existingCodeIds, onSave, onClo
         <h3>{type.label} 항목 추가</h3>
         <div className="form-grid">
           <div className="form-group full">
-            <label>항목 선택 ({type.key === 'INCOME' ? '소득 코드' : '기관분류 코드'})</label>
+            <label>항목 선택 ({type.codeLabel})</label>
             <select value={codeId} onChange={e => setCodeId(e.target.value)} autoFocus>
               <option value="">선택</option>
               {options.map(l => (
