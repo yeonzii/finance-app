@@ -70,6 +70,13 @@ export const updateAssetItem = (id, data) =>
 export const deleteAssetItem = (id) =>
   api.delete(`/asset-items/${id}`);
 
+// ── 자산현황 월별 값 ──────────────────────────────
+export const getAssetValues = (year) =>
+  api.get('/asset-values', { params: { year } }).then(r => r.data);
+
+export const saveAssetValue = (data) =>
+  api.post('/asset-values', data).then(r => r.data);
+
 // ── 자산현황 ──────────────────────────────────────
 export const getAssets = (year) =>
   api.get('/assets', { params: { year } }).then(r => r.data);
