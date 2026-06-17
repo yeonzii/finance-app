@@ -77,17 +77,6 @@ export const getAssetValues = (year) =>
 export const saveAssetValue = (data) =>
   api.post('/asset-values', data).then(r => r.data);
 
-// ── 자산현황 ──────────────────────────────────────
-export const getAssets = (year) =>
-  api.get('/assets', { params: { year } }).then(r => r.data);
-
-export const getAsset = (year, month) =>
-  api.get(`/assets/${year}/${month}`).then(r => r.data);
-
-export const saveAsset = (data) =>
-  data.id ? api.put(`/assets/${data.id}`, data).then(r => r.data)
-           : api.post('/assets', data).then(r => r.data);
-
 // ── 대출계획 ──────────────────────────────────────
 export const getLoans = () =>
   api.get('/loans').then(r => r.data);
