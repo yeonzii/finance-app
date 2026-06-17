@@ -68,9 +68,14 @@ export default function FixedCostPage() {
   const openEdit = (row) => setModal({ mode: 'edit', data: { ...row } });
   const closeModal = () => setModal(null);
 
+  // 세부항목 코드의 분류(부모) ID
+  const parentOf = (leafCdId) => codes.find(c => c.cdId === leafCdId)?.parentCdId ?? '_';
+
   const handleSave = async (data) => {
     const payload = {
       ...data,
+      // 항목명은 선택한 세부항목 코드명에서 자동 세팅
+      itemName: nameById(data.subcategoryCode),
       amount: data.amount === '' ? null : +data.amount,
       transactionDay: data.transactionDay === '' ? null : +data.transactionDay,
       billingDay: data.billingDay === '' ? null : +data.billingDay,
@@ -87,11 +92,11 @@ export default function FixedCostPage() {
     load();
   };
 
-  // 분류별 그룹핑
+  // 분류(세부항목의 부모)별 그룹핑
   const grouped = subcats
-    .map(sc => ({ sc, items: list.filter(f => f.subcategoryCode === sc.cdId) }))
+    .map(sc => ({ sc, items: list.filter(f => parentOf(f.subcategoryCode) === sc.cdId) }))
     .filter(g => g.items.length > 0);
-  const ungrouped = list.filter(f => !subcats.some(sc => sc.cdId === f.subcategoryCode));
+  const ungrouped = list.filter(f => !subcats.some(sc => sc.cdId === parentOf(f.subcategoryCode)));
   if (ungrouped.length) grouped.push({ sc: { cdId: '_', cdNm: '기타' }, items: ungrouped });
 
   const total = list.reduce((s, f) => s + (f.amount || 0), 0);
@@ -123,7 +128,7 @@ export default function FixedCostPage() {
         <table>
           <thead>
             <tr>
-              <th>분류</th><th>항목명</th><th>금액</th>
+              <th>분류</th><th>세부항목</th><th>금액</th>
               <th>기관</th><th>거래일</th><th>청구일</th><th>메모</th><th></th>
             </tr>
           </thead>
@@ -170,6 +175,7 @@ export default function FixedCostPage() {
           subcats={subcats}
           orgTypes={orgTypes}
           leafDescendants={leafDescendants}
+          parentOf={parentOf}
           MoneyInput={MoneyInput}
           onSave={handleSave}
           onClose={closeModal}
@@ -179,9 +185,14 @@ export default function FixedCostPage() {
   );
 }
 
-function FixedCostModal({ modal, subcats, orgTypes, leafDescendants, MoneyInput, onSave, onClose }) {
+function FixedCostModal({ modal, subcats, orgTypes, leafDescendants, parentOf, MoneyInput, onSave, onClose }) {
   const [form, setForm] = useState(modal.data);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  // 분류(세부항목의 부모) — 수정 시 기존 세부항목으로부터 역추적
+  const [selectedCat, setSelectedCat] = useState(modal.data.subcategoryCode ? parentOf(modal.data.subcategoryCode) : '');
+  // 선택된 분류의 세부항목(말단 코드)
+  const subItems = selectedCat ? leafDescendants(selectedCat) : [];
 
   // 수정 시 기존 기관코드로부터 기관 종류 역추적
   const initialType = (() => {
@@ -199,14 +210,20 @@ function FixedCostModal({ modal, subcats, orgTypes, leafDescendants, MoneyInput,
         <div className="form-grid">
           <div className="form-group">
             <label>분류</label>
-            <select value={form.subcategoryCode} onChange={e => set('subcategoryCode', e.target.value)}>
+            <select value={selectedCat} onChange={e => { setSelectedCat(e.target.value); set('subcategoryCode', ''); }}>
               <option value="">선택</option>
               {subcats.map(c => <option key={c.cdId} value={c.cdId}>{c.cdNm}</option>)}
             </select>
           </div>
           <div className="form-group">
-            <label>항목명</label>
-            <input value={form.itemName} onChange={e => set('itemName', e.target.value)} placeholder="예: SKT 휴대폰" />
+            <label>세부항목</label>
+            <select value={form.subcategoryCode || ''} onChange={e => set('subcategoryCode', e.target.value)} disabled={!selectedCat}>
+              <option value="">선택</option>
+              {subItems.map(c => <option key={c.cdId} value={c.cdId}>{c.cdNm}</option>)}
+            </select>
+            {selectedCat && subItems.length === 0 && (
+              <small style={{ color: '#c62828' }}>세부항목이 없어요. 공통코드 관리에서 먼저 추가하세요.</small>
+            )}
           </div>
           <div className="form-group">
             <label>금액</label>
@@ -241,7 +258,7 @@ function FixedCostModal({ modal, subcats, orgTypes, leafDescendants, MoneyInput,
         </div>
         <div className="modal-actions">
           <button className="btn btn-cancel" onClick={onClose}>취소</button>
-          <button className="btn btn-primary" onClick={() => onSave(form)} disabled={!form.subcategoryCode || !form.itemName}>저장</button>
+          <button className="btn btn-primary" onClick={() => onSave(form)} disabled={!form.subcategoryCode}>저장</button>
         </div>
       </div>
     </div>
