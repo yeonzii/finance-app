@@ -70,6 +70,13 @@ export const updateAssetItem = (id, data) =>
 export const deleteAssetItem = (id) =>
   api.delete(`/asset-items/${id}`);
 
+// ── 결제기관(카드사) 결제일 ───────────────────────
+export const getPaymentInstitutions = () =>
+  api.get('/payment-institutions').then(r => r.data);
+
+export const savePaymentInstitution = (data) =>
+  api.post('/payment-institutions', data).then(r => r.data);
+
 // ── 자산현황 월별 값 ──────────────────────────────
 export const getAssetValues = (year) =>
   api.get('/asset-values', { params: { year } }).then(r => r.data);

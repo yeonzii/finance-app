@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   getFixedCosts, createFixedCost, updateFixedCost, deleteFixedCost,
-  getAllCodes
+  getAllCodes, getPaymentInstitutions
 } from '../api';
 
 const fmt = (n) => n != null && n !== '' ? Number(n).toLocaleString('ko-KR') : '-';
@@ -40,12 +40,18 @@ function MoneyInput({ value, onChange, placeholder }) {
 export default function FixedCostPage() {
   const [list, setList] = useState([]);
   const [codes, setCodes] = useState([]);
+  const [payMap, setPayMap] = useState({}); // 카드사 codeId → 결제일
   const [modal, setModal] = useState(null);
 
   const load = () => getFixedCosts().then(setList);
   useEffect(() => {
     load();
     getAllCodes().then(all => setCodes(all.filter(c => c.delYn === 'N')));
+    getPaymentInstitutions().then(plist => {
+      const m = {};
+      plist.forEach(p => { if (p.paymentDay != null) m[p.codeId] = p.paymentDay; });
+      setPayMap(m);
+    });
   }, []);
 
   const childrenOf = (pid) =>
@@ -132,7 +138,7 @@ export default function FixedCostPage() {
               <th style={{ textAlign: 'center' }}>세부항목</th>
               <th style={{ textAlign: 'center' }}>금액</th>
               <th style={{ textAlign: 'center' }}>기관</th>
-              <th style={{ textAlign: 'center' }}>거래일</th>
+              <th style={{ textAlign: 'center' }}>결제일자</th>
               <th style={{ textAlign: 'center' }}>청구일</th>
               <th style={{ textAlign: 'center' }}>메모</th><th></th>
             </tr>
@@ -181,6 +187,7 @@ export default function FixedCostPage() {
           orgTypes={orgTypes}
           leafDescendants={leafDescendants}
           parentOf={parentOf}
+          payMap={payMap}
           MoneyInput={MoneyInput}
           onSave={handleSave}
           onClose={closeModal}
@@ -190,7 +197,7 @@ export default function FixedCostPage() {
   );
 }
 
-function FixedCostModal({ modal, subcats, orgTypes, leafDescendants, parentOf, MoneyInput, onSave, onClose }) {
+function FixedCostModal({ modal, subcats, orgTypes, leafDescendants, parentOf, payMap, MoneyInput, onSave, onClose }) {
   const [form, setForm] = useState(modal.data);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -207,6 +214,12 @@ function FixedCostModal({ modal, subcats, orgTypes, leafDescendants, parentOf, M
   })();
   const [selectedOrgType, setSelectedOrgType] = useState(initialType);
   const orgs = selectedOrgType ? leafDescendants(selectedOrgType) : [];
+
+  // 기관 지정 + 결제일(카드사) 자동채움 → 결제일자(transactionDay)
+  const applyOrg = (orgCd) => {
+    set('orgCode', orgCd);
+    if (orgCd && payMap[orgCd] != null) set('transactionDay', payMap[orgCd]);
+  };
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -243,13 +256,13 @@ function FixedCostModal({ modal, subcats, orgTypes, leafDescendants, parentOf, M
           </div>
           <div className="form-group">
             <label>기관명</label>
-            <select value={form.orgCode || ''} onChange={e => set('orgCode', e.target.value)} disabled={!selectedOrgType}>
+            <select value={form.orgCode || ''} onChange={e => applyOrg(e.target.value)} disabled={!selectedOrgType}>
               <option value="">없음</option>
               {orgs.map(o => <option key={o.cdId} value={o.cdId}>{o.cdNm}</option>)}
             </select>
           </div>
           <div className="form-group">
-            <label>거래일</label>
+            <label>결제일자</label>
             <input type="number" min={1} max={31} value={form.transactionDay || ''} onChange={e => set('transactionDay', e.target.value ? +e.target.value : '')} placeholder="일" />
           </div>
           <div className="form-group">

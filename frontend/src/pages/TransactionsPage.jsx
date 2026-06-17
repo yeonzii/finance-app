@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   getTransactions, createTransaction, updateTransaction, deleteTransaction,
-  getAllCodes, generateFixedCosts
+  getAllCodes, generateFixedCosts, getPaymentInstitutions
 } from '../api';
 
 const fmt = (n) => n != null ? Number(n).toLocaleString('ko-KR') : '-';
@@ -30,6 +30,7 @@ export default function TransactionsPage() {
   const [rows, setRows]   = useState([]);
   const [modal, setModal] = useState(null);
   const [codes, setCodes] = useState([]);   // 활성 코드 전체
+  const [payMap, setPayMap] = useState({}); // 카드사 codeId → 결제일
   const [collapsed, setCollapsed] = useState({}); // `${cat}-${mid}` → true(접힘)
   const toggleMid = (cat, mid) =>
     setCollapsed(c => ({ ...c, [`${cat}-${mid}`]: !c[`${cat}-${mid}`] }));
@@ -37,6 +38,11 @@ export default function TransactionsPage() {
 
   useEffect(() => {
     getAllCodes().then(all => setCodes(all.filter(c => c.delYn === 'N')));
+    getPaymentInstitutions().then(list => {
+      const m = {};
+      list.forEach(p => { if (p.paymentDay != null) m[p.codeId] = p.paymentDay; });
+      setPayMap(m);
+    });
   }, []);
 
   // ── 코드 헬퍼 ──────────────────────────────────
@@ -169,7 +175,7 @@ export default function TransactionsPage() {
           <thead>
             <tr>
               <th style={{ width: 150 }}>대분류</th><th style={{ width: 150 }}>중분류</th><th>소분류</th><th>금액</th>
-              <th>일자</th><th>청구일</th><th>기관</th><th>메모</th><th></th>
+              <th>결제일자</th><th>청구일</th><th>기관</th><th>메모</th><th></th>
             </tr>
           </thead>
           <tbody>
@@ -271,6 +277,7 @@ export default function TransactionsPage() {
           leafDescendants={leafDescendants}
           middleOf={middleOf}
           autoOrgFromCode={autoOrgFromCode}
+          payMap={payMap}
           onSave={handleSave}
           onClose={closeModal}
         />
@@ -279,7 +286,7 @@ export default function TransactionsPage() {
   );
 }
 
-function TransactionModal({ modal, categories, orgTypes, childrenOf, leafDescendants, middleOf, autoOrgFromCode, onSave, onClose }) {
+function TransactionModal({ modal, categories, orgTypes, childrenOf, leafDescendants, middleOf, autoOrgFromCode, payMap, onSave, onClose }) {
   const [form, setForm] = useState(modal.data);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -298,12 +305,18 @@ function TransactionModal({ modal, categories, orgTypes, childrenOf, leafDescend
   );
   const orgs = selectedOrgType ? leafDescendants(selectedOrgType) : [];
 
+  // 기관 지정 + 결제일(카드사) 자동채움
+  const applyOrg = (orgCd) => {
+    set('orgCode', orgCd);
+    if (orgCd && payMap[orgCd] != null) set('transactionDay', payMap[orgCd]);
+  };
+
   // 소분류 지정 + 관련기관 자동채움 (수정 가능)
   const applySub = (v) => {
     set('subcategoryCode', v);
     if (!v) return;
     const auto = autoOrgFromCode(v);
-    if (auto && auto.orgCode) { setSelectedOrgType(auto.orgType); set('orgCode', auto.orgCode); }
+    if (auto && auto.orgCode) { setSelectedOrgType(auto.orgType); applyOrg(auto.orgCode); }
   };
 
   const onChangeCategory = (v) => { set('categoryCode', v); setMiddle(''); set('subcategoryCode', ''); };
@@ -354,7 +367,7 @@ function TransactionModal({ modal, categories, orgTypes, childrenOf, leafDescend
             <input type="number" value={form.amount} onChange={e => set('amount', +e.target.value)} placeholder="0" />
           </div>
           <div className="form-group">
-            <label>일자</label>
+            <label>결제일자</label>
             <input type="number" min={1} max={31} value={form.transactionDay || ''} onChange={e => set('transactionDay', e.target.value ? +e.target.value : null)} placeholder="일" />
           </div>
           <div className="form-group">
@@ -370,7 +383,7 @@ function TransactionModal({ modal, categories, orgTypes, childrenOf, leafDescend
           </div>
           <div className="form-group">
             <label>기관명</label>
-            <select value={form.orgCode || ''} onChange={e => set('orgCode', e.target.value)} disabled={!selectedOrgType}>
+            <select value={form.orgCode || ''} onChange={e => applyOrg(e.target.value)} disabled={!selectedOrgType}>
               <option value="">없음</option>
               {orgs.map(o => <option key={o.cdId} value={o.cdId}>{o.cdNm}</option>)}
             </select>
