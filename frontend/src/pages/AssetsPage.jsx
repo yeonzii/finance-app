@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getAssetItems, getAssetValues, saveAssetValue, getAllCodes } from '../api';
+import { getAssetItems, getAssetValues, saveAssetValue, getAllCodes, getTransactions } from '../api';
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1);
 const fmt = (n) => n != null && n !== '' ? Number(n).toLocaleString('ko-KR') : '';
@@ -10,7 +10,7 @@ const TYPES = [
   { key: 'ASSET',   label: '자산', color: '#283593', bg: '#e8eaf6' },
 ];
 
-// 인라인 금액 입력 셀 (콤마 표시, blur/Enter 시 저장)
+// 인라인 금액 입력 셀 (콤마 표시, blur/Enter 시 저장) — 자산(ASSET) 행 전용
 function CellInput({ value, onCommit }) {
   const [display, setDisplay] = useState(value != null ? Number(value).toLocaleString('ko-KR') : '');
   useEffect(() => {
@@ -47,7 +47,8 @@ export default function AssetsPage() {
   const [year, setYear] = useState(now.getFullYear());
   const [items, setItems] = useState([]);
   const [codes, setCodes] = useState([]);
-  const [values, setValues] = useState([]);
+  const [values, setValues] = useState([]); // ASSET 행 수동 입력값
+  const [txs, setTxs] = useState([]);        // 거래내역 (소득/지출 자동계산용)
 
   useEffect(() => {
     getAssetItems().then(setItems);
@@ -57,27 +58,63 @@ export default function AssetsPage() {
   const loadValues = useCallback(() => getAssetValues(year).then(setValues), [year]);
   useEffect(() => { loadValues(); }, [loadValues]);
 
+  // 소득=같은 년월 / 지출=다음 달 → 올해 전체 + 내년 1월 거래까지 필요
+  useEffect(() => {
+    Promise.all([getTransactions(year), getTransactions(year + 1, 1)])
+      .then(([a, b]) => setTxs([...(a || []), ...(b || [])]))
+      .catch(() => setTxs([]));
+  }, [year]);
+
   const nameById = (cdId) => codes.find(c => c.cdId === cdId)?.cdNm ?? cdId ?? '-';
 
+  // txCode가 ancCode(구성항목 코드)와 같거나 그 하위인지
+  const inSubtree = (txCode, ancCode) => {
+    let c = txCode;
+    for (let i = 0; i < 8 && c; i++) {
+      if (c === ancCode) return true;
+      c = codes.find(x => x.cdId === c)?.parentCdId;
+    }
+    return false;
+  };
+
+  // 거래 합계: 특정 항목코드 × (년,월)
+  const txSum = (codeId, ty, tm) =>
+    txs.filter(t => t.year === ty && t.month === tm && inSubtree(t.subcategoryCode, codeId))
+       .reduce((s, t) => s + (t.amount || 0), 0);
+
+  // ASSET 수동값 맵
   const valueMap = {};
   values.forEach(v => { valueMap[`${v.assetItemId}-${v.month}`] = v.amount; });
-  const getVal = (itemId, month) => valueMap[`${itemId}-${month}`];
 
+  // 항목×월 값: 소득/지출은 거래에서 자동계산, 자산은 수동값
+  const getVal = (item, month) => {
+    if (item.assetType === 'INCOME') {
+      return txSum(item.codeId, year, month); // 같은 년월
+    }
+    if (item.assetType === 'EXPENSE') {
+      const m = month + 1;                     // 다음 달 지출
+      const ty = m > 12 ? year + 1 : year;
+      const tm = m > 12 ? 1 : m;
+      return txSum(item.codeId, ty, tm);
+    }
+    return valueMap[`${item.id}-${month}`];    // ASSET: 수동
+  };
+
+  const itemsOf = (typeKey) => items.filter(i => i.assetType === typeKey);
   const typeMonthTotal = (typeKey, month) =>
-    items.filter(i => i.assetType === typeKey)
-         .reduce((s, i) => s + (getVal(i.id, month) || 0), 0);
-  const itemYearTotal = (itemId) =>
-    MONTHS.reduce((s, m) => s + (getVal(itemId, m) || 0), 0);
+    itemsOf(typeKey).reduce((s, i) => s + (getVal(i, month) || 0), 0);
+  const itemYearTotal = (item) =>
+    MONTHS.reduce((s, m) => s + (getVal(item, m) || 0), 0);
 
-  const commitValue = async (itemId, month, amount) => {
-    const cur = getVal(itemId, month) ?? null;
-    if (cur === amount) return; // 변경 없으면 저장 생략
-    await saveAssetValue({ assetItemId: itemId, year, month, amount });
+  const commitValue = async (item, month, amount) => {
+    const cur = getVal(item, month) ?? null;
+    if (cur === amount) return;
+    await saveAssetValue({ assetItemId: item.id, year, month, amount });
     loadValues();
   };
 
   const activeTypes = TYPES
-    .map(t => ({ ...t, list: items.filter(i => i.assetType === t.key) }))
+    .map(t => ({ ...t, list: itemsOf(t.key) }))
     .filter(t => t.list.length > 0);
 
   const hasItems = items.length > 0;
@@ -95,7 +132,7 @@ export default function AssetsPage() {
       </div>
 
       <div style={{ fontSize: 12, color: '#888', marginBottom: 12 }}>
-        💡 셀에 바로 금액을 입력하세요 (Enter 또는 다른 곳 클릭 시 저장). 항목 구성은 <b>자산 항목 구성</b> 탭에서 관리해요.
+        💡 <b>소득·지출</b> 행은 소득/지출 내역에서 자동 계산돼요 (소득=같은 달, 지출=다음 달 항목). <b>자산</b> 행만 셀에 직접 입력합니다.
       </div>
 
       {!hasItems ? (
@@ -111,7 +148,7 @@ export default function AssetsPage() {
                 {activeTypes.map(t => (
                   <th key={t.key} colSpan={t.list.length + 1}
                       style={{ textAlign: 'center', color: t.color, background: t.bg }}>
-                    {t.label}
+                    {t.label}{t.key !== 'ASSET' && <span style={{ fontWeight: 400, fontSize: 11 }}> (자동)</span>}
                   </th>
                 ))}
                 <th rowSpan={2} style={{ textAlign: 'center', width: 96, minWidth: 96, background: '#fff8e1' }}>수지<br/>(소득-지출)</th>
@@ -133,8 +170,10 @@ export default function AssetsPage() {
                     <td style={{ position: 'sticky', left: 0, background: '#fff', fontWeight: 600, textAlign: 'center' }}>{m}월</td>
                     {activeTypes.flatMap(t => [
                       ...t.list.map(it => (
-                        <td key={it.id} style={{ padding: 2 }}>
-                          <CellInput value={getVal(it.id, m)} onCommit={(amt) => commitValue(it.id, m, amt)} />
+                        <td key={it.id} style={{ padding: t.key === 'ASSET' ? 2 : '8px 6px', textAlign: 'right', background: t.key === 'ASSET' ? undefined : '#fcfcfc' }}>
+                          {t.key === 'ASSET'
+                            ? <CellInput value={getVal(it, m)} onCommit={(amt) => commitValue(it, m, amt)} />
+                            : <span style={{ color: getVal(it, m) ? '#333' : '#ccc' }}>{getVal(it, m) ? fmt(getVal(it, m)) : '·'}</span>}
                         </td>
                       )),
                       <td key={`${t.key}-sum`} style={{ textAlign: 'right', fontWeight: 600, color: t.color, background: t.bg }}>
@@ -153,7 +192,7 @@ export default function AssetsPage() {
                 <td style={{ position: 'sticky', left: 0, background: '#f5f5f5', fontWeight: 700, textAlign: 'center' }}>합계</td>
                 {activeTypes.flatMap(t => [
                   ...t.list.map(it => (
-                    <td key={it.id} style={{ textAlign: 'right', fontWeight: 600 }}>{fmt(itemYearTotal(it.id))}</td>
+                    <td key={it.id} style={{ textAlign: 'right', fontWeight: 600 }}>{fmt(itemYearTotal(it))}</td>
                   )),
                   <td key={`${t.key}-sum`} style={{ textAlign: 'right', fontWeight: 700, color: t.color, background: t.bg }}>
                     {fmt(MONTHS.reduce((s, m) => s + typeMonthTotal(t.key, m), 0))}
