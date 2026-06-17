@@ -115,6 +115,19 @@ export default function AssetsPage() {
     loadValues();
   };
 
+  // ── 자산 증감 ────────────────────────────────────
+  const UP = '#2196f3';   // 증가: 밝은 파랑
+  const DOWN = '#b71c1c'; // 감소: 어두운 빨강
+  const changeColor = (v) => v > 0 ? UP : v < 0 ? DOWN : '#999';
+  const fmtSigned = (v) => (v > 0 ? '+' : '') + Number(v).toLocaleString('ko-KR');
+  const assetMonthTotal = (m) => typeMonthTotal('ASSET', m);
+  // 자산 데이터가 있는 마지막 월 (1월 대비 증감 기준)
+  const lastAssetMonth = (() => {
+    for (let m = 12; m >= 1; m--) if (assetMonthTotal(m) !== 0) return m;
+    return 1;
+  })();
+  const ytdAssetChange = assetMonthTotal(lastAssetMonth) - assetMonthTotal(1);
+
   const activeTypes = TYPES
     .map(t => ({ ...t, list: itemsOf(t.key) }))
     .filter(t => t.list.length > 0);
@@ -160,7 +173,9 @@ export default function AssetsPage() {
                   ...t.list.map(it => (
                     <th key={it.id} style={{ textAlign: 'center', width: 96, minWidth: 96 }}>{nameById(it.codeId)}</th>
                   )),
-                  <th key={`${t.key}-sum`} style={{ textAlign: 'center', width: 96, minWidth: 96, color: t.color, background: t.bg }}>{t.label}합계</th>,
+                  <th key={`${t.key}-sum`} style={{ textAlign: 'center', width: t.key === 'ASSET' ? 160 : 96, minWidth: t.key === 'ASSET' ? 160 : 96, color: t.color, background: t.bg }}>
+                    {t.label}합계{t.key === 'ASSET' && <span style={{ fontWeight: 400, fontSize: 11 }}> (전월비)</span>}
+                  </th>,
                 ])}
               </tr>
             </thead>
@@ -178,8 +193,13 @@ export default function AssetsPage() {
                             : <span style={{ color: getVal(it, m) ? '#333' : '#ccc' }}>{getVal(it, m) ? fmt(getVal(it, m)) : '·'}</span>}
                         </td>
                       )),
-                      <td key={`${t.key}-sum`} style={{ textAlign: 'right', fontWeight: 600, color: t.color, background: t.bg }}>
+                      <td key={`${t.key}-sum`} style={{ textAlign: 'right', fontWeight: 600, color: t.color, background: t.bg, whiteSpace: 'nowrap' }}>
                         {fmt(typeMonthTotal(t.key, m)) || '·'}
+                        {t.key === 'ASSET' && m > 1 && assetMonthTotal(m) !== 0 && assetMonthTotal(m - 1) !== 0 && (
+                          <span style={{ marginLeft: 5, fontSize: 11, fontWeight: 600, color: changeColor(assetMonthTotal(m) - assetMonthTotal(m - 1)) }}>
+                            ({fmtSigned(assetMonthTotal(m) - assetMonthTotal(m - 1))})
+                          </span>
+                        )}
                       </td>,
                     ])}
                     <td style={{ textAlign: 'right', fontWeight: 600, background: '#fff8e1', color: net >= 0 ? '#2e7d32' : '#c62828' }}>
@@ -189,15 +209,20 @@ export default function AssetsPage() {
                 );
               })}
 
-              {/* 연간 합계 행 */}
+              {/* 합계 행 (자산은 연간합계 대신 1월 대비 증감) */}
               <tr className="summary-row" style={{ borderTop: '2px solid #999' }}>
                 <td style={{ position: 'sticky', left: 0, background: '#f5f5f5', fontWeight: 700, textAlign: 'center' }}>합계</td>
                 {activeTypes.flatMap(t => [
                   ...t.list.map(it => (
-                    <td key={it.id} style={{ textAlign: 'right', fontWeight: 600 }}>{fmt(itemYearTotal(it))}</td>
+                    <td key={it.id} style={{ textAlign: 'right', fontWeight: 600 }}>
+                      {t.key === 'ASSET' ? '' : fmt(itemYearTotal(it))}
+                    </td>
                   )),
-                  <td key={`${t.key}-sum`} style={{ textAlign: 'right', fontWeight: 700, color: t.color, background: t.bg }}>
-                    {fmt(MONTHS.reduce((s, m) => s + typeMonthTotal(t.key, m), 0))}
+                  <td key={`${t.key}-sum`} title={t.key === 'ASSET' ? '1월 대비 증감액' : ''}
+                      style={{ textAlign: 'right', fontWeight: 700, color: t.key === 'ASSET' ? changeColor(ytdAssetChange) : t.color, background: t.bg, whiteSpace: 'nowrap' }}>
+                    {t.key === 'ASSET'
+                      ? `${fmtSigned(ytdAssetChange)}`
+                      : fmt(MONTHS.reduce((s, m) => s + typeMonthTotal(t.key, m), 0))}
                   </td>,
                 ])}
                 <td style={{ textAlign: 'right', fontWeight: 700, background: '#fff3c4' }}>
