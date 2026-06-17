@@ -28,7 +28,6 @@ export default function AssetsPage() {
 
   const nameById = (cdId) => codes.find(c => c.cdId === cdId)?.cdNm ?? cdId ?? '-';
 
-  // 값 조회 맵: `${itemId}-${month}` → amount
   const valueMap = {};
   values.forEach(v => { valueMap[`${v.assetItemId}-${v.month}`] = v.amount; });
   const getVal = (itemId, month) => valueMap[`${itemId}-${month}`];
@@ -51,6 +50,11 @@ export default function AssetsPage() {
     closeModal();
     loadValues();
   };
+
+  // 항목이 있는 구분만
+  const activeTypes = TYPES
+    .map(t => ({ ...t, list: items.filter(i => i.assetType === t.key) }))
+    .filter(t => t.list.length > 0);
 
   const hasItems = items.length > 0;
 
@@ -76,70 +80,66 @@ export default function AssetsPage() {
         </div></div>
       ) : (
         <div className="table-wrap" style={{ overflowX: 'auto' }}>
-          <table style={{ minWidth: 1100 }}>
+          <table style={{ minWidth: 900 }}>
             <thead>
               <tr>
-                <th style={{ position: 'sticky', left: 0, background: '#e8eaf6', minWidth: 140 }}>항목</th>
-                {MONTHS.map(m => <th key={m} style={{ textAlign: 'right', minWidth: 72 }}>{m}월</th>)}
-                <th style={{ textAlign: 'right', minWidth: 90, background: '#e8eaf6' }}>연간합계</th>
+                <th rowSpan={2} style={{ position: 'sticky', left: 0, background: '#e8eaf6', minWidth: 56 }}>월</th>
+                {activeTypes.map(t => (
+                  <th key={t.key} colSpan={t.list.length + 1}
+                      style={{ textAlign: 'center', color: t.color, background: t.bg }}>
+                    {t.label}
+                  </th>
+                ))}
+                <th rowSpan={2} style={{ textAlign: 'right', minWidth: 90, background: '#fff8e1' }}>수지<br/>(소득-지출)</th>
+              </tr>
+              <tr>
+                {activeTypes.flatMap(t => [
+                  ...t.list.map(it => (
+                    <th key={it.id} style={{ textAlign: 'right', minWidth: 80 }}>{nameById(it.codeId)}</th>
+                  )),
+                  <th key={`${t.key}-sum`} style={{ textAlign: 'right', minWidth: 84, color: t.color, background: t.bg }}>{t.label}합계</th>,
+                ])}
               </tr>
             </thead>
             <tbody>
-              {TYPES.map(t => {
-                const list = items.filter(i => i.assetType === t.key);
-                if (list.length === 0) return null;
-                return [
-                  <tr key={`${t.key}-h`} style={{ background: t.bg }}>
-                    <td colSpan={14} style={{ fontWeight: 700, color: t.color, position: 'sticky', left: 0, background: t.bg }}>
-                      {t.label}
-                    </td>
-                  </tr>,
-                  ...list.map(it => (
-                    <tr key={it.id}>
-                      <td style={{ position: 'sticky', left: 0, background: '#fff', fontWeight: 600 }}>
-                        {nameById(it.codeId)}
-                      </td>
-                      {MONTHS.map(m => {
+              {MONTHS.map(m => {
+                const net = typeMonthTotal('INCOME', m) - typeMonthTotal('EXPENSE', m);
+                return (
+                  <tr key={m}>
+                    <td style={{ position: 'sticky', left: 0, background: '#fff', fontWeight: 600 }}>{m}월</td>
+                    {activeTypes.flatMap(t => [
+                      ...t.list.map(it => {
                         const v = getVal(it.id, m);
                         return (
-                          <td key={m}
-                              onClick={() => openCell(it, m)}
+                          <td key={it.id} onClick={() => openCell(it, m)}
                               style={{ textAlign: 'right', cursor: 'pointer', color: v != null ? '#222' : '#ccc' }}
                               title="클릭해서 입력">
                             {v != null ? fmt(v) : '·'}
                           </td>
                         );
-                      })}
-                      <td style={{ textAlign: 'right', fontWeight: 600, background: '#fafafa' }}>{fmt(itemYearTotal(it.id))}</td>
-                    </tr>
-                  )),
-                  <tr key={`${t.key}-sum`} className="summary-row">
-                    <td style={{ position: 'sticky', left: 0, background: '#f5f5f5', color: t.color, fontWeight: 700 }}>
-                      {t.label} 합계
-                    </td>
-                    {MONTHS.map(m => (
-                      <td key={m} style={{ textAlign: 'right', fontWeight: 600, color: t.color }}>
+                      }),
+                      <td key={`${t.key}-sum`} style={{ textAlign: 'right', fontWeight: 600, color: t.color, background: t.bg }}>
                         {fmt(typeMonthTotal(t.key, m)) || '·'}
-                      </td>
-                    ))}
-                    <td style={{ textAlign: 'right', fontWeight: 700, color: t.color, background: '#eee' }}>
-                      {fmt(MONTHS.reduce((s, m) => s + typeMonthTotal(t.key, m), 0))}
-                    </td>
-                  </tr>,
-                ];
-              })}
-
-              {/* 수지(소득-지출) */}
-              <tr className="summary-row" style={{ borderTop: '2px solid #999' }}>
-                <td style={{ position: 'sticky', left: 0, background: '#fff8e1', fontWeight: 700 }}>수지 (소득-지출)</td>
-                {MONTHS.map(m => {
-                  const net = typeMonthTotal('INCOME', m) - typeMonthTotal('EXPENSE', m);
-                  return (
-                    <td key={m} style={{ textAlign: 'right', fontWeight: 600, color: net >= 0 ? '#2e7d32' : '#c62828' }}>
+                      </td>,
+                    ])}
+                    <td style={{ textAlign: 'right', fontWeight: 600, background: '#fff8e1', color: net >= 0 ? '#2e7d32' : '#c62828' }}>
                       {fmt(net) || '·'}
                     </td>
-                  );
-                })}
+                  </tr>
+                );
+              })}
+
+              {/* 연간 합계 행 */}
+              <tr className="summary-row" style={{ borderTop: '2px solid #999' }}>
+                <td style={{ position: 'sticky', left: 0, background: '#f5f5f5', fontWeight: 700 }}>합계</td>
+                {activeTypes.flatMap(t => [
+                  ...t.list.map(it => (
+                    <td key={it.id} style={{ textAlign: 'right', fontWeight: 600 }}>{fmt(itemYearTotal(it.id))}</td>
+                  )),
+                  <td key={`${t.key}-sum`} style={{ textAlign: 'right', fontWeight: 700, color: t.color, background: t.bg }}>
+                    {fmt(MONTHS.reduce((s, m) => s + typeMonthTotal(t.key, m), 0))}
+                  </td>,
+                ])}
                 <td style={{ textAlign: 'right', fontWeight: 700, background: '#fff3c4' }}>
                   {fmt(MONTHS.reduce((s, m) => s + typeMonthTotal('INCOME', m) - typeMonthTotal('EXPENSE', m), 0))}
                 </td>
