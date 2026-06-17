@@ -159,7 +159,7 @@ export default function TransactionsPage() {
         <table>
           <thead>
             <tr>
-              <th>대분류</th><th>중분류</th><th>소분류</th><th>금액</th>
+              <th style={{ width: 150 }}>대분류</th><th>중분류</th><th>소분류</th><th>금액</th>
               <th>일자</th><th>청구일</th><th>기관</th><th>메모</th><th></th>
             </tr>
           </thead>
@@ -181,7 +181,7 @@ export default function TransactionsPage() {
               const catCell = () => {
                 catRendered = true;
                 return (
-                  <td rowSpan={catRowSpan}>
+                  <td rowSpan={catRowSpan} style={{ width: 150, whiteSpace: 'nowrap' }}>
                     <span className="category-label" style={{ background: style.bg, color: style.color }}>
                       {cat.cdNm}
                     </span>
