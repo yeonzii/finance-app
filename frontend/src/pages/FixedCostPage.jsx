@@ -128,8 +128,13 @@ export default function FixedCostPage() {
         <table>
           <thead>
             <tr>
-              <th>분류</th><th>세부항목</th><th>금액</th>
-              <th>기관</th><th>거래일</th><th>청구일</th><th>메모</th><th></th>
+              <th style={{ width: 90, textAlign: 'center' }}>분류</th>
+              <th style={{ textAlign: 'center' }}>세부항목</th>
+              <th style={{ textAlign: 'center' }}>금액</th>
+              <th style={{ textAlign: 'center' }}>기관</th>
+              <th style={{ textAlign: 'center' }}>거래일</th>
+              <th style={{ textAlign: 'center' }}>청구일</th>
+              <th style={{ textAlign: 'center' }}>메모</th><th></th>
             </tr>
           </thead>
           <tbody>
@@ -140,7 +145,7 @@ export default function FixedCostPage() {
               items.map((f, i) => (
                 <tr key={f.id}>
                   {i === 0 && (
-                    <td rowSpan={items.length + 1}>
+                    <td rowSpan={items.length + 1} style={{ width: 90, whiteSpace: 'nowrap' }}>
                       <span className="category-label" style={{ background: '#ffebee', color: '#c62828' }}>
                         {sc.cdNm}
                       </span>
@@ -148,7 +153,7 @@ export default function FixedCostPage() {
                   )}
                   <td style={{ fontWeight: 600 }}>{f.itemName}</td>
                   <td className="amount-negative">{fmt(f.amount)}</td>
-                  <td>{f.orgCode ? nameById(f.orgCode) : '-'}</td>
+                  <td style={{ textAlign: 'center' }}>{f.orgCode ? nameById(f.orgCode) : '-'}</td>
                   <td style={{ textAlign: 'center' }}>{f.transactionDay ? `${f.transactionDay}일` : '-'}</td>
                   <td style={{ textAlign: 'center' }}>{f.billingDay ? `${f.billingDay}일` : '-'}</td>
                   <td style={{ color: '#888' }}>{f.note}</td>
