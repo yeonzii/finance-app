@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import {
-  getAssetItems, createAssetItem, deleteAssetItem, getAllCodes
+  getAssetItems, createAssetItem, updateAssetItem, deleteAssetItem, getAllCodes
 } from '../api';
 
 const INCOME_ROOT = 'CD1000'; // 소득
@@ -18,6 +18,7 @@ export default function AssetItemsPage() {
   const [items, setItems] = useState([]);
   const [codes, setCodes] = useState([]);
   const [modal, setModal] = useState(null);
+  const [drag, setDrag] = useState(null); // { id, type }
 
   const load = () => getAssetItems().then(setItems);
   useEffect(() => {
@@ -59,6 +60,43 @@ export default function AssetItemsPage() {
     load();
   };
 
+  // ── 순서 변경 ────────────────────────────────────
+  const listOf = (typeKey) =>
+    items.filter(i => i.assetType === typeKey)
+         .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.id - b.id);
+
+  const persistOrder = async (ordered) => {
+    const changed = ordered
+      .map((it, i) => ({ it, sort: i + 1 }))
+      .filter(({ it, sort }) => it.sortOrder !== sort);
+    if (changed.length === 0) return;
+    await Promise.all(changed.map(({ it, sort }) => updateAssetItem(it.id, { ...it, sortOrder: sort })));
+    load();
+  };
+
+  const move = (typeKey, id, dir) => {
+    const list = listOf(typeKey);
+    const idx = list.findIndex(i => i.id === id);
+    const j = idx + dir;
+    if (j < 0 || j >= list.length) return;
+    const re = [...list];
+    [re[idx], re[j]] = [re[j], re[idx]];
+    persistOrder(re);
+  };
+
+  const onDropRow = (typeKey, targetId) => {
+    if (!drag || drag.type !== typeKey || drag.id === targetId) { setDrag(null); return; }
+    const list = listOf(typeKey);
+    const from = list.findIndex(i => i.id === drag.id);
+    const to = list.findIndex(i => i.id === targetId);
+    if (from < 0 || to < 0) { setDrag(null); return; }
+    const re = [...list];
+    const [moved] = re.splice(from, 1);
+    re.splice(to, 0, moved);
+    setDrag(null);
+    persistOrder(re);
+  };
+
   return (
     <div>
       <div className="page-header">
@@ -66,11 +104,12 @@ export default function AssetItemsPage() {
       </div>
       <div style={{ fontSize: 12, color: '#888', marginBottom: 16 }}>
         💡 자산현황에 표시할 항목을 구분별로 구성하세요. 소득은 <b>소득 코드</b>, 지출·자산은 <b>기관분류 코드</b>에서 선택합니다.
+        <br/>↕ 드래그하거나 <b>▲▼</b> 버튼으로 순서를 바꾸면 자산현황에도 그 순서로 반영돼요.
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
         {TYPES.map(t => {
-          const list = items.filter(i => i.assetType === t.key);
+          const list = listOf(t.key);
           return (
             <div key={t.key} className="table-wrap" style={{ borderTop: `3px solid ${t.color}` }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px' }}>
@@ -82,16 +121,28 @@ export default function AssetItemsPage() {
               </div>
               <table>
                 <thead>
-                  <tr><th>분류</th><th>항목</th><th></th></tr>
+                  <tr><th style={{ width: 24 }}></th><th>분류</th><th>항목</th><th>순서</th><th></th></tr>
                 </thead>
                 <tbody>
                   {list.length === 0 && (
-                    <tr><td colSpan={3} className="empty-state">구성된 항목이 없어요.</td></tr>
+                    <tr><td colSpan={5} className="empty-state">구성된 항목이 없어요.</td></tr>
                   )}
-                  {list.map(it => (
-                    <tr key={it.id}>
+                  {list.map((it, idx) => (
+                    <tr key={it.id}
+                        draggable
+                        onDragStart={() => setDrag({ id: it.id, type: t.key })}
+                        onDragOver={e => e.preventDefault()}
+                        onDrop={() => onDropRow(t.key, it.id)}
+                        style={{ background: drag?.id === it.id ? '#eef' : undefined, cursor: 'grab' }}>
+                      <td style={{ textAlign: 'center', color: '#bbb', cursor: 'grab' }} title="드래그하여 이동">⠿</td>
                       <td style={{ color: '#888', fontSize: 12, textAlign: 'center' }}>{parentName(it.codeId) || '-'}</td>
                       <td style={{ fontWeight: 600 }}>{nameById(it.codeId)}</td>
+                      <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                        <button className="btn" style={{ padding: '2px 6px', background: '#e8eaf6', color: '#3949ab' }}
+                                disabled={idx === 0} onClick={() => move(t.key, it.id, -1)} title="위로">▲</button>
+                        <button className="btn" style={{ padding: '2px 6px', marginLeft: 2, background: '#e8eaf6', color: '#3949ab' }}
+                                disabled={idx === list.length - 1} onClick={() => move(t.key, it.id, 1)} title="아래로">▼</button>
+                      </td>
                       <td style={{ textAlign: 'right' }}>
                         <button className="btn btn-danger" onClick={() => handleDelete(it)}>삭제</button>
                       </td>

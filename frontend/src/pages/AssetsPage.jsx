@@ -100,7 +100,9 @@ export default function AssetsPage() {
     return valueMap[`${item.id}-${month}`];    // ASSET: 수동
   };
 
-  const itemsOf = (typeKey) => items.filter(i => i.assetType === typeKey);
+  const itemsOf = (typeKey) =>
+    items.filter(i => i.assetType === typeKey)
+         .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.id - b.id);
   const typeMonthTotal = (typeKey, month) =>
     itemsOf(typeKey).reduce((s, i) => s + (getVal(i, month) || 0), 0);
   const itemYearTotal = (item) =>
