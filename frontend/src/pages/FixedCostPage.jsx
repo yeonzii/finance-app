@@ -224,8 +224,10 @@ function FixedCostModal({ modal, subcats, orgTypes, leafDescendants, parentOf, p
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()}>
+      <div className="modal modal-wide" onClick={e => e.stopPropagation()}>
         <h3>{modal.mode === 'add' ? '고정비 추가' : '고정비 수정'}</h3>
+
+        {/* 분류 / 세부항목 */}
         <div className="form-grid">
           <div className="form-group">
             <label>분류</label>
@@ -244,10 +246,29 @@ function FixedCostModal({ modal, subcats, orgTypes, leafDescendants, parentOf, p
               <small style={{ color: '#c62828' }}>세부항목이 없어요. 공통코드 관리에서 먼저 추가하세요.</small>
             )}
           </div>
+        </div>
+
+        {/* 금액 / 청구일 */}
+        <div className="form-grid">
           <div className="form-group">
             <label>금액</label>
             <MoneyInput value={form.amount} onChange={v => set('amount', v)} placeholder="0" />
           </div>
+          <div className="form-group">
+            <label>청구일</label>
+            <input type="number" min={1} max={31} value={form.billingDay || ''}
+                   onChange={e => {
+                     const day = e.target.value ? +e.target.value : '';
+                     setForm(f => ({
+                       ...f, billingDay: day,
+                       transactionDay: (selectedOrgType === BANK && day !== '') ? day : f.transactionDay,
+                     }));
+                   }} placeholder="일" />
+          </div>
+        </div>
+
+        {/* 기관 종류 / 기관명 / 결제일 */}
+        <div className="form-grid cols-3">
           <div className="form-group">
             <label>기관 종류</label>
             <select value={selectedOrgType} onChange={e => { setSelectedOrgType(e.target.value); set('orgCode', ''); }}>
@@ -263,20 +284,13 @@ function FixedCostModal({ modal, subcats, orgTypes, leafDescendants, parentOf, p
             </select>
           </div>
           <div className="form-group">
-            <label>청구일</label>
-            <input type="number" min={1} max={31} value={form.billingDay || ''}
-                   onChange={e => {
-                     const day = e.target.value ? +e.target.value : '';
-                     setForm(f => ({
-                       ...f, billingDay: day,
-                       transactionDay: (selectedOrgType === BANK && day !== '') ? day : f.transactionDay,
-                     }));
-                   }} placeholder="일" />
-          </div>
-          <div className="form-group">
             <label>결제일</label>
             <input type="number" min={1} max={31} value={form.transactionDay || ''} onChange={e => set('transactionDay', e.target.value ? +e.target.value : '')} placeholder="일" />
           </div>
+        </div>
+
+        {/* 메모 */}
+        <div className="form-grid">
           <div className="form-group full">
             <label>메모</label>
             <input value={form.note || ''} onChange={e => set('note', e.target.value)} placeholder="메모" />
