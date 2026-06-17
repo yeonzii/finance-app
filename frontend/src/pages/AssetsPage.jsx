@@ -104,24 +104,24 @@ export default function AssetsPage() {
         </div></div>
       ) : (
         <div className="table-wrap" style={{ overflowX: 'auto' }}>
-          <table style={{ minWidth: 900 }}>
+          <table style={{ width: 'max-content', minWidth: '100%' }}>
             <thead>
               <tr>
-                <th rowSpan={2} style={{ position: 'sticky', left: 0, background: '#e8eaf6', minWidth: 56, textAlign: 'center' }}>월</th>
+                <th rowSpan={2} style={{ position: 'sticky', left: 0, background: '#e8eaf6', width: 56, minWidth: 56, textAlign: 'center' }}>월</th>
                 {activeTypes.map(t => (
                   <th key={t.key} colSpan={t.list.length + 1}
                       style={{ textAlign: 'center', color: t.color, background: t.bg }}>
                     {t.label}
                   </th>
                 ))}
-                <th rowSpan={2} style={{ textAlign: 'center', minWidth: 90, background: '#fff8e1' }}>수지<br/>(소득-지출)</th>
+                <th rowSpan={2} style={{ textAlign: 'center', width: 96, minWidth: 96, background: '#fff8e1' }}>수지<br/>(소득-지출)</th>
               </tr>
               <tr>
                 {activeTypes.flatMap(t => [
                   ...t.list.map(it => (
-                    <th key={it.id} style={{ textAlign: 'center', minWidth: 80 }}>{nameById(it.codeId)}</th>
+                    <th key={it.id} style={{ textAlign: 'center', width: 96, minWidth: 96 }}>{nameById(it.codeId)}</th>
                   )),
-                  <th key={`${t.key}-sum`} style={{ textAlign: 'center', minWidth: 84, color: t.color, background: t.bg }}>{t.label}합계</th>,
+                  <th key={`${t.key}-sum`} style={{ textAlign: 'center', width: 96, minWidth: 96, color: t.color, background: t.bg }}>{t.label}합계</th>,
                 ])}
               </tr>
             </thead>
