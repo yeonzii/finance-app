@@ -9,6 +9,7 @@ const fmt = (n) => n != null ? Number(n).toLocaleString('ko-KR') : '-';
 const ROOT = 'CD0000';
 const ORG_ROOT = 'CD3000';   // 기관분류
 const INCOME = 'CD1000';     // 소득
+const BANK = 'CD3300';       // 기관분류 > 은행
 
 // 대분류 코드 → 색상
 const CATEGORY_STYLE = {
@@ -175,7 +176,7 @@ export default function TransactionsPage() {
           <thead>
             <tr>
               <th style={{ width: 150 }}>대분류</th><th style={{ width: 150 }}>중분류</th><th>소분류</th><th>금액</th>
-              <th>결제일자</th><th>청구일</th><th>기관</th><th>메모</th><th></th>
+              <th>청구일</th><th>기관</th><th>결제일</th><th>메모</th><th></th>
             </tr>
           </thead>
           <tbody>
@@ -240,9 +241,9 @@ export default function TransactionsPage() {
                         )}
                         <td>{nameById(row.subcategoryCode)}</td>
                         <td className={isIncome ? 'amount-positive' : 'amount-negative'}>{fmt(row.amount)}</td>
-                        <td className="col-c">{row.transactionDay ? `${row.transactionDay}일` : ''}</td>
                         <td className="col-c" style={{ color: '#888', fontSize: 12 }}>{row.billingDay ? `${row.billingDay}일` : ''}</td>
                         <td className="col-c">{row.orgCode ? nameById(row.orgCode) : ''}</td>
+                        <td className="col-c">{row.transactionDay ? `${row.transactionDay}일` : ''}</td>
                         <td style={{ color: '#888' }}>{row.note}</td>
                         <td>
                           <button className="btn btn-edit" onClick={() => openEdit(row)} style={{ marginRight: 4 }}>수정</button>
@@ -326,11 +327,19 @@ function TransactionModal({ modal, categories, orgTypes, childrenOf, leafDescend
     if (leaves.length === 0) applySub(v); // 중분류가 말단이면 그것이 곧 소분류
     else set('subcategoryCode', '');
   };
+  // 청구일 입력: 기관 종류가 은행이면 결제일도 동일하게
+  const onChangeBilling = (v) => {
+    const day = v ? +v : null;
+    set('billingDay', day);
+    if (selectedOrgType === BANK && day != null) set('transactionDay', day);
+  };
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()}>
+      <div className="modal modal-wide" onClick={e => e.stopPropagation()}>
         <h3>{modal.mode === 'add' ? '항목 추가' : '항목 수정'}</h3>
+
+        {/* 년/월 */}
         <div className="form-grid">
           <div className="form-group">
             <label>년</label>
@@ -340,6 +349,10 @@ function TransactionModal({ modal, categories, orgTypes, childrenOf, leafDescend
             <label>월</label>
             <input type="number" min={1} max={12} value={form.month} onChange={e => set('month', +e.target.value)} />
           </div>
+        </div>
+
+        {/* 대분류 / 중분류 / 소분류 */}
+        <div className="form-grid cols-3">
           <div className="form-group">
             <label>대분류</label>
             <select value={form.categoryCode} onChange={e => onChangeCategory(e.target.value)}>
@@ -362,18 +375,22 @@ function TransactionModal({ modal, categories, orgTypes, childrenOf, leafDescend
               {subcodes.map(c => <option key={c.cdId} value={c.cdId}>{c.cdNm}</option>)}
             </select>
           </div>
+        </div>
+
+        {/* 금액 / 청구일 */}
+        <div className="form-grid">
           <div className="form-group">
             <label>금액</label>
             <input type="number" value={form.amount} onChange={e => set('amount', +e.target.value)} placeholder="0" />
           </div>
           <div className="form-group">
-            <label>결제일자</label>
-            <input type="number" min={1} max={31} value={form.transactionDay || ''} onChange={e => set('transactionDay', e.target.value ? +e.target.value : null)} placeholder="일" />
-          </div>
-          <div className="form-group">
             <label>청구일</label>
-            <input type="number" min={1} max={31} value={form.billingDay || ''} onChange={e => set('billingDay', e.target.value ? +e.target.value : null)} placeholder="일" />
+            <input type="number" min={1} max={31} value={form.billingDay || ''} onChange={e => onChangeBilling(e.target.value)} placeholder="일" />
           </div>
+        </div>
+
+        {/* 기관 종류 / 기관명 / 결제일 */}
+        <div className="form-grid cols-3">
           <div className="form-group">
             <label>기관 종류</label>
             <select value={selectedOrgType} onChange={e => { setSelectedOrgType(e.target.value); set('orgCode', ''); }}>
@@ -388,6 +405,14 @@ function TransactionModal({ modal, categories, orgTypes, childrenOf, leafDescend
               {orgs.map(o => <option key={o.cdId} value={o.cdId}>{o.cdNm}</option>)}
             </select>
           </div>
+          <div className="form-group">
+            <label>결제일</label>
+            <input type="number" min={1} max={31} value={form.transactionDay || ''} onChange={e => set('transactionDay', e.target.value ? +e.target.value : null)} placeholder="일" />
+          </div>
+        </div>
+
+        {/* 메모 */}
+        <div className="form-grid">
           <div className="form-group full">
             <label>메모</label>
             <input value={form.note || ''} onChange={e => set('note', e.target.value)} placeholder="메모" />

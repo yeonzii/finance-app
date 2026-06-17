@@ -8,6 +8,7 @@ const fmt = (n) => n != null && n !== '' ? Number(n).toLocaleString('ko-KR') : '
 
 const FIXED_PARENT = 'CD2100'; // 고정비용
 const ORG_ROOT = 'CD3000';     // 기관분류
+const BANK = 'CD3300';         // 기관분류 > 은행
 
 const EMPTY = {
   subcategoryCode: '', itemName: '', amount: '', orgCode: '',
@@ -137,9 +138,9 @@ export default function FixedCostPage() {
               <th style={{ width: 90, textAlign: 'center' }}>분류</th>
               <th style={{ textAlign: 'center' }}>세부항목</th>
               <th style={{ textAlign: 'center' }}>금액</th>
-              <th style={{ textAlign: 'center' }}>기관</th>
-              <th style={{ textAlign: 'center' }}>결제일자</th>
               <th style={{ textAlign: 'center' }}>청구일</th>
+              <th style={{ textAlign: 'center' }}>기관</th>
+              <th style={{ textAlign: 'center' }}>결제일</th>
               <th style={{ textAlign: 'center' }}>메모</th><th></th>
             </tr>
           </thead>
@@ -159,9 +160,9 @@ export default function FixedCostPage() {
                   )}
                   <td style={{ fontWeight: 600 }}>{f.itemName}</td>
                   <td className="amount-negative">{fmt(f.amount)}</td>
+                  <td style={{ textAlign: 'center' }}>{f.billingDay ? `${f.billingDay}일` : '-'}</td>
                   <td style={{ textAlign: 'center' }}>{f.orgCode ? nameById(f.orgCode) : '-'}</td>
                   <td style={{ textAlign: 'center' }}>{f.transactionDay ? `${f.transactionDay}일` : '-'}</td>
-                  <td style={{ textAlign: 'center' }}>{f.billingDay ? `${f.billingDay}일` : '-'}</td>
                   <td style={{ color: '#888' }}>{f.note}</td>
                   <td>
                     <button className="btn btn-edit" onClick={() => openEdit(f)} style={{ marginRight: 4 }}>수정</button>
@@ -262,12 +263,19 @@ function FixedCostModal({ modal, subcats, orgTypes, leafDescendants, parentOf, p
             </select>
           </div>
           <div className="form-group">
-            <label>결제일자</label>
-            <input type="number" min={1} max={31} value={form.transactionDay || ''} onChange={e => set('transactionDay', e.target.value ? +e.target.value : '')} placeholder="일" />
+            <label>청구일</label>
+            <input type="number" min={1} max={31} value={form.billingDay || ''}
+                   onChange={e => {
+                     const day = e.target.value ? +e.target.value : '';
+                     setForm(f => ({
+                       ...f, billingDay: day,
+                       transactionDay: (selectedOrgType === BANK && day !== '') ? day : f.transactionDay,
+                     }));
+                   }} placeholder="일" />
           </div>
           <div className="form-group">
-            <label>청구일</label>
-            <input type="number" min={1} max={31} value={form.billingDay || ''} onChange={e => set('billingDay', e.target.value ? +e.target.value : '')} placeholder="일" />
+            <label>결제일</label>
+            <input type="number" min={1} max={31} value={form.transactionDay || ''} onChange={e => set('transactionDay', e.target.value ? +e.target.value : '')} placeholder="일" />
           </div>
           <div className="form-group full">
             <label>메모</label>
