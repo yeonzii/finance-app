@@ -77,6 +77,15 @@ export default function TransactionsPage() {
       .sort((a, b) => a.midId.localeCompare(b.midId));
   };
 
+  // 소분류 코드의 관련기관(REL_ORG_CD) → { orgCode, orgType(기관 종류) }
+  const autoOrgFromCode = (subCd) => {
+    const rel = codes.find(c => c.cdId === subCd)?.relOrgCd;
+    if (!rel) return null;
+    let n = codes.find(c => c.cdId === rel);
+    while (n && n.parentCdId && n.parentCdId !== ORG_ROOT) n = codes.find(c => c.cdId === n.parentCdId);
+    return { orgCode: rel, orgType: n?.cdId ?? '' };
+  };
+
   // 거래 대분류 = ROOT의 자식 중 기관분류 제외 (소득/비용/투자)
   const categories = childrenOf(ROOT).filter(c => c.cdId !== ORG_ROOT);
   // 기관 종류 = 기관분류의 자식 (카드사/보험사/은행/증권사)
@@ -261,6 +270,7 @@ export default function TransactionsPage() {
           childrenOf={childrenOf}
           leafDescendants={leafDescendants}
           middleOf={middleOf}
+          autoOrgFromCode={autoOrgFromCode}
           onSave={handleSave}
           onClose={closeModal}
         />
@@ -269,7 +279,7 @@ export default function TransactionsPage() {
   );
 }
 
-function TransactionModal({ modal, categories, orgTypes, childrenOf, leafDescendants, middleOf, onSave, onClose }) {
+function TransactionModal({ modal, categories, orgTypes, childrenOf, leafDescendants, middleOf, autoOrgFromCode, onSave, onClose }) {
   const [form, setForm] = useState(modal.data);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -280,16 +290,29 @@ function TransactionModal({ modal, categories, orgTypes, childrenOf, leafDescend
   const middleOptions = form.categoryCode ? childrenOf(form.categoryCode) : [];
   const subcodes = middle ? leafDescendants(middle) : []; // 선택한 중분류의 말단 항목
 
+  // 기관 종류 선택 → 해당 기관들 (수정 시 기존 기관코드로부터 종류 역추적)
+  const findOrgType = (orgCd) =>
+    orgTypes.find(t => leafDescendants(t.cdId).some(o => o.cdId === orgCd))?.cdId ?? '';
+  const [selectedOrgType, setSelectedOrgType] = useState(
+    modal.data.orgCode ? findOrgType(modal.data.orgCode) : ''
+  );
+  const orgs = selectedOrgType ? leafDescendants(selectedOrgType) : [];
+
+  // 소분류 지정 + 관련기관 자동채움 (수정 가능)
+  const applySub = (v) => {
+    set('subcategoryCode', v);
+    if (!v) return;
+    const auto = autoOrgFromCode(v);
+    if (auto && auto.orgCode) { setSelectedOrgType(auto.orgType); set('orgCode', auto.orgCode); }
+  };
+
   const onChangeCategory = (v) => { set('categoryCode', v); setMiddle(''); set('subcategoryCode', ''); };
   const onChangeMiddle = (v) => {
     setMiddle(v);
     const leaves = v ? leafDescendants(v) : [];
-    set('subcategoryCode', leaves.length === 0 ? v : ''); // 중분류가 말단이면 그것이 곧 소분류
+    if (leaves.length === 0) applySub(v); // 중분류가 말단이면 그것이 곧 소분류
+    else set('subcategoryCode', '');
   };
-
-  // 기관 종류 선택 → 해당 기관들
-  const [selectedOrgType, setSelectedOrgType] = useState('');
-  const orgs = selectedOrgType ? leafDescendants(selectedOrgType) : [];
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -320,7 +343,7 @@ function TransactionModal({ modal, categories, orgTypes, childrenOf, leafDescend
           </div>
           <div className="form-group">
             <label>소분류</label>
-            <select value={form.subcategoryCode} onChange={e => set('subcategoryCode', e.target.value)}
+            <select value={form.subcategoryCode} onChange={e => applySub(e.target.value)}
                     disabled={!middle || subcodes.length === 0}>
               <option value="">{subcodes.length === 0 && middle ? '(중분류가 말단)' : '선택'}</option>
               {subcodes.map(c => <option key={c.cdId} value={c.cdId}>{c.cdNm}</option>)}
