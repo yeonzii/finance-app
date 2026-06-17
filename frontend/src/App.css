@@ -86,11 +86,16 @@ th {
   background: #e8eaf6;
   color: #283593;
   padding: 10px 12px;
-  text-align: left;
+  text-align: center;
   font-weight: 600;
   white-space: nowrap;
   border-bottom: 2px solid #c5cae9;
 }
+
+/* 금액 셀: 우측정렬 / 날짜·기관 등: 중앙정렬 */
+td.amount-positive, td.amount-negative { text-align: right; }
+.col-c { text-align: center; }
+.col-r { text-align: right; }
 
 td {
   padding: 8px 12px;

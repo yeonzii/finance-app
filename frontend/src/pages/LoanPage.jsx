@@ -224,9 +224,9 @@ function PlanTab({ plans, getRateForMonth, latestBalance, totalRepaid, totalInte
                 Number(rateInfo.annualRate).toFixed(2) !== Number(p.appliedRate).toFixed(2);
               return (
                 <tr key={p.id}>
-                  <td style={{ fontWeight: 600 }}>{p.year}년 {p.month}월</td>
-                  <td>{fmt(p.loanAmount)}</td>
-                  <td style={{ fontWeight: 600, color: '#1a237e' }}>
+                  <td className="col-c" style={{ fontWeight: 600 }}>{p.year}년 {p.month}월</td>
+                  <td className="col-r">{fmt(p.loanAmount)}</td>
+                  <td className="col-c" style={{ fontWeight: 600, color: '#1a237e' }}>
                     {fmtRate(p.appliedRate)}
                     {hasRateMismatch && (
                       <span title={`현재 이자율: ${fmtRate(rateInfo?.annualRate)}`}
@@ -235,15 +235,15 @@ function PlanTab({ plans, getRateForMonth, latestBalance, totalRepaid, totalInte
                       </span>
                     )}
                   </td>
-                  <td style={{ color: '#e65100', fontWeight: 600 }}>
+                  <td className="col-r" style={{ color: '#e65100', fontWeight: 600 }}>
                     {fmt(p.interestAmount)}
                     <span style={{ color: '#aaa', fontWeight: 400, fontSize: 11, marginLeft: 4 }}>
                       ({p.paymentDay || 27}일)
                     </span>
                   </td>
-                  <td>{fmt(p.repaymentAmount)}</td>
-                  <td style={{ color: '#2e7d32' }}>{p.extraPayment ? fmt(p.extraPayment) : '-'}</td>
-                  <td style={{ fontWeight: 700, color: '#c62828' }}>{fmt(p.remainingBalance)}</td>
+                  <td className="col-r">{fmt(p.repaymentAmount)}</td>
+                  <td className="col-r" style={{ color: '#2e7d32' }}>{p.extraPayment ? fmt(p.extraPayment) : '-'}</td>
+                  <td className="col-r" style={{ fontWeight: 700, color: '#c62828' }}>{fmt(p.remainingBalance)}</td>
                   <td>
                     <button className="btn btn-edit" onClick={() => onEdit(p)} style={{ marginRight: 4 }}>수정</button>
                     <button className="btn btn-danger" onClick={() => onDelete(p.id)}>삭제</button>
@@ -253,13 +253,13 @@ function PlanTab({ plans, getRateForMonth, latestBalance, totalRepaid, totalInte
             })}
             {plans.length > 0 && (
               <tr className="summary-row">
-                <td>합계</td>
-                <td>-</td>
-                <td>-</td>
-                <td style={{ color: '#e65100' }}>{fmt(totalInterest)}</td>
-                <td>{fmt(plans.reduce((s, r) => s + (r.repaymentAmount || 0), 0))}</td>
-                <td>{fmt(plans.reduce((s, r) => s + (r.extraPayment || 0), 0))}</td>
-                <td>-</td>
+                <td className="col-c">합계</td>
+                <td className="col-c">-</td>
+                <td className="col-c">-</td>
+                <td className="col-r" style={{ color: '#e65100' }}>{fmt(totalInterest)}</td>
+                <td className="col-r">{fmt(plans.reduce((s, r) => s + (r.repaymentAmount || 0), 0))}</td>
+                <td className="col-r">{fmt(plans.reduce((s, r) => s + (r.extraPayment || 0), 0))}</td>
+                <td className="col-c">-</td>
                 <td></td>
               </tr>
             )}
@@ -304,14 +304,14 @@ function RatesTab({ rates, plans, getRateForMonth, onAdd, onEdit, onDelete }) {
               const monthlyRate = r.annualRate ? (Number(r.annualRate) / 12).toFixed(4) : '-';
               return (
                 <tr key={r.id} style={!isActive ? { opacity: 0.4 } : {}}>
-                  <td style={{ fontWeight: 600 }}>{r.startYear}년 {r.startMonth}월</td>
-                  <td>{r.endYear && r.endMonth ? `${r.endYear}년 ${r.endMonth}월` : '현재까지'}</td>
-                  <td style={{ fontWeight: 700, color: '#1a237e', fontSize: 15 }}>
+                  <td className="col-c" style={{ fontWeight: 600 }}>{r.startYear}년 {r.startMonth}월</td>
+                  <td className="col-c">{r.endYear && r.endMonth ? `${r.endYear}년 ${r.endMonth}월` : '현재까지'}</td>
+                  <td className="col-c" style={{ fontWeight: 700, color: '#1a237e', fontSize: 15 }}>
                     {fmtRate(r.annualRate)}
                   </td>
-                  <td style={{ color: '#555' }}>{monthlyRate}%</td>
+                  <td className="col-c" style={{ color: '#555' }}>{monthlyRate}%</td>
                   <td style={{ color: '#888' }}>{r.note}</td>
-                  <td>
+                  <td className="col-c">
                     <span style={{
                       padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 600,
                       background: isActive ? '#e8f5e9' : '#ffebee',
@@ -359,13 +359,13 @@ function RatesTab({ rates, plans, getRateForMonth, onAdd, onEdit, onDelete }) {
                     Number(p.appliedRate).toFixed(2) === Number(currentRate.annualRate).toFixed(2);
                   return (
                     <tr key={p.id}>
-                      <td style={{ fontWeight: 600 }}>{p.year}년 {p.month}월</td>
-                      <td>{fmt(p.loanAmount)}</td>
-                      <td style={{ fontWeight: 600, color: '#1a237e' }}>{fmtRate(p.appliedRate)}</td>
-                      <td style={{ color: '#e65100' }}>{fmt(p.interestAmount)}</td>
-                      <td>매달 {p.paymentDay || 27}일</td>
-                      <td>{currentRate ? fmtRate(currentRate.annualRate) : '등록된 이자율 없음'}</td>
-                      <td>
+                      <td className="col-c" style={{ fontWeight: 600 }}>{p.year}년 {p.month}월</td>
+                      <td className="col-r">{fmt(p.loanAmount)}</td>
+                      <td className="col-c" style={{ fontWeight: 600, color: '#1a237e' }}>{fmtRate(p.appliedRate)}</td>
+                      <td className="col-r" style={{ color: '#e65100' }}>{fmt(p.interestAmount)}</td>
+                      <td className="col-c">매달 {p.paymentDay || 27}일</td>
+                      <td className="col-c">{currentRate ? fmtRate(currentRate.annualRate) : '등록된 이자율 없음'}</td>
+                      <td className="col-c">
                         <span style={{
                           padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 600,
                           background: isSame ? '#e8f5e9' : '#fff3e0',

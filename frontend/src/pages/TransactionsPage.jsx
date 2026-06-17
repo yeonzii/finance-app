@@ -225,9 +225,9 @@ export default function TransactionsPage() {
                         )}
                         <td>{nameById(row.subcategoryCode)}</td>
                         <td className={isIncome ? 'amount-positive' : 'amount-negative'}>{fmt(row.amount)}</td>
-                        <td>{row.transactionDay ? `${row.transactionDay}일` : ''}</td>
-                        <td style={{ color: '#888', fontSize: 12 }}>{row.billingDay ? `청구일 ${row.billingDay}일` : ''}</td>
-                        <td>{row.orgCode ? nameById(row.orgCode) : ''}</td>
+                        <td className="col-c">{row.transactionDay ? `${row.transactionDay}일` : ''}</td>
+                        <td className="col-c" style={{ color: '#888', fontSize: 12 }}>{row.billingDay ? `${row.billingDay}일` : ''}</td>
+                        <td className="col-c">{row.orgCode ? nameById(row.orgCode) : ''}</td>
                         <td style={{ color: '#888' }}>{row.note}</td>
                         <td>
                           <button className="btn btn-edit" onClick={() => openEdit(row)} style={{ marginRight: 4 }}>수정</button>
