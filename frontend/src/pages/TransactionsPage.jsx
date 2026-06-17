@@ -9,7 +9,10 @@ const fmt = (n) => n != null ? Number(n).toLocaleString('ko-KR') : '-';
 const ROOT = 'CD0000';
 const ORG_ROOT = 'CD3000';   // 기관분류
 const INCOME = 'CD1000';     // 소득
+const EXPENSE = 'CD2000';    // 비용
 const BANK = 'CD3300';       // 기관분류 > 은행
+const CARD_ROOT = 'CD3100';  // 기관분류 > 카드사
+const CARDVALUE = 'CD2210';  // 가변비용 > 카드값
 
 // 대분류 코드 → 색상
 const CATEGORY_STYLE = {
@@ -59,6 +62,20 @@ export default function TransactionsPage() {
       return grand.length ? grand : [k];
     });
   };
+  // code가 anc(조상) 자신이거나 하위인지
+  const isUnder = (code, anc) => {
+    let c = code;
+    for (let i = 0; i < 8 && c; i++) {
+      if (c === anc) return true;
+      c = codes.find(x => x.cdId === c)?.parentCdId;
+    }
+    return false;
+  };
+  const relOrgOf = (cdId) => codes.find(c => c.cdId === cdId)?.relOrgCd;
+  // 카드 결제로 중복 계상되는 거래: 카드값 하위가 아니면서 관련기관이 카드사
+  const isCardDuplicate = (subCd) =>
+    !isUnder(subCd, CARDVALUE) && isUnder(relOrgOf(subCd), CARD_ROOT);
+
   // 말단(leaf) 코드에서 대분류(top)의 직속 자식(=중분류) 코드ID 도출
   const middleOf = (leafCdId, topCdId) => {
     let cur = codes.find(c => c.cdId === leafCdId);
@@ -186,12 +203,17 @@ export default function TransactionsPage() {
             {grouped.map(({ cat, items }) => {
               const style = catStyle(cat.cdId);
               const mids = middleGroupsOf(cat.cdId, items);
-              // 대분류 셀 rowspan = (각 중분류: 접힘 1행 / 펼침 항목수) 합 + 대분류 소계 1행
-              const catRowSpan = mids.reduce(
-                (s, g) => s + (isCollapsed(cat.cdId, g.midId) ? 1 : g.items.length), 0
-              ) + 1;
               const catTotal = items.reduce((s, r) => s + (r.amount || 0), 0);
               const isIncome = cat.cdId === INCOME;
+              // 비용 대분류: 카드 결제로 중복 계상된 금액
+              const dupCost = cat.cdId === EXPENSE
+                ? items.filter(r => isCardDuplicate(r.subcategoryCode)).reduce((s, r) => s + (r.amount || 0), 0)
+                : 0;
+              const extraRows = dupCost > 0 ? 2 : 0; // (-)중복비용, (=)중복제거비용
+              // 대분류 셀 rowspan = (각 중분류: 접힘 1행 / 펼침 항목수) 합 + 소계 + 추가요약
+              const catRowSpan = mids.reduce(
+                (s, g) => s + (isCollapsed(cat.cdId, g.midId) ? 1 : g.items.length), 0
+              ) + 1 + extraRows;
               const out = [];
               let catRendered = false;
               const catCell = () => {
@@ -263,6 +285,23 @@ export default function TransactionsPage() {
                   <td colSpan={5}></td>
                 </tr>
               );
+              // 비용: 카드 중복비용 / 중복제거비용
+              if (dupCost > 0) {
+                out.push(
+                  <tr key={`dup-${cat.cdId}`} style={{ background: '#fff8f8' }}>
+                    <td style={{ color: '#e65100', fontSize: 12 }} colSpan={2}>(-) 카드 중복비용</td>
+                    <td style={{ color: '#e65100', fontWeight: 600 }}>-{fmt(dupCost)}</td>
+                    <td colSpan={5} style={{ color: '#aaa', fontSize: 11 }}>고정비 중 카드결제분 (카드값에 이미 포함)</td>
+                  </tr>
+                );
+                out.push(
+                  <tr key={`net-${cat.cdId}`} className="summary-row" style={{ background: '#f1f8e9' }}>
+                    <td style={{ color: '#2e7d32', fontWeight: 700 }} colSpan={2}>(=) 중복제거 비용</td>
+                    <td style={{ color: '#2e7d32', fontWeight: 700 }}>{fmt(catTotal - dupCost)}</td>
+                    <td colSpan={5}></td>
+                  </tr>
+                );
+              }
               return out;
             })}
           </tbody>
