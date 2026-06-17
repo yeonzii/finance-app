@@ -30,6 +30,10 @@ export default function TransactionsPage() {
   const [rows, setRows]   = useState([]);
   const [modal, setModal] = useState(null);
   const [codes, setCodes] = useState([]);   // 활성 코드 전체
+  const [collapsed, setCollapsed] = useState({}); // `${cat}-${mid}` → true(접힘)
+  const toggleMid = (cat, mid) =>
+    setCollapsed(c => ({ ...c, [`${cat}-${mid}`]: !c[`${cat}-${mid}`] }));
+  const isCollapsed = (cat, mid) => !!collapsed[`${cat}-${mid}`];
 
   useEffect(() => {
     getAllCodes().then(all => setCodes(all.filter(c => c.delYn === 'N')));
@@ -55,6 +59,22 @@ export default function TransactionsPage() {
       cur = codes.find(c => c.cdId === cur.parentCdId);
     }
     return cur?.cdId ?? '';
+  };
+
+  // 대분류 내 거래를 중분류별로 그룹핑 (중분류 코드 순)
+  const middleGroupsOf = (cat, items) => {
+    const map = new Map();
+    items.forEach(it => {
+      const mid = middleOf(it.subcategoryCode, cat) || it.subcategoryCode;
+      if (!map.has(mid)) map.set(mid, []);
+      map.get(mid).push(it);
+    });
+    return [...map.entries()]
+      .map(([midId, list]) => ({
+        midId, items: list,
+        subtotal: list.reduce((s, r) => s + (r.amount || 0), 0),
+      }))
+      .sort((a, b) => a.midId.localeCompare(b.midId));
   };
 
   // 거래 대분류 = ROOT의 자식 중 기관분류 제외 (소득/비용/투자)
@@ -149,44 +169,85 @@ export default function TransactionsPage() {
             )}
             {grouped.map(({ cat, items }) => {
               const style = catStyle(cat.cdId);
-              return items.map((row, i) => (
-                <tr key={row.id}>
-                  {i === 0 && (
-                    <td rowSpan={items.length + 1}>
-                      <span className="category-label" style={{ background: style.bg, color: style.color }}>
-                        {cat.cdNm}
-                      </span>
-                    </td>
-                  )}
-                  {(() => {
-                    const mid = middleOf(row.subcategoryCode, cat.cdId);
-                    return (
-                      <td style={{ color: '#666' }}>
-                        {mid && mid !== row.subcategoryCode ? nameById(mid) : '-'}
+              const mids = middleGroupsOf(cat.cdId, items);
+              // 대분류 셀 rowspan = (각 중분류: 접힘 1행 / 펼침 항목수) 합 + 대분류 소계 1행
+              const catRowSpan = mids.reduce(
+                (s, g) => s + (isCollapsed(cat.cdId, g.midId) ? 1 : g.items.length), 0
+              ) + 1;
+              const catTotal = items.reduce((s, r) => s + (r.amount || 0), 0);
+              const isIncome = cat.cdId === INCOME;
+              const out = [];
+              let catRendered = false;
+              const catCell = () => {
+                catRendered = true;
+                return (
+                  <td rowSpan={catRowSpan}>
+                    <span className="category-label" style={{ background: style.bg, color: style.color }}>
+                      {cat.cdNm}
+                    </span>
+                  </td>
+                );
+              };
+
+              mids.forEach(g => {
+                const collapsed = isCollapsed(cat.cdId, g.midId);
+                const midName = nameById(g.midId);
+                const toggle = (
+                  <span onClick={() => toggleMid(cat.cdId, g.midId)} style={{ cursor: 'pointer', userSelect: 'none' }}>
+                    <span style={{ color: '#3949ab', marginRight: 4 }}>{collapsed ? '▶' : '▼'}</span>{midName}
+                  </span>
+                );
+
+                if (collapsed) {
+                  out.push(
+                    <tr key={`${cat.cdId}-${g.midId}`} style={{ background: '#fcfcfd' }}>
+                      {!catRendered && catCell()}
+                      <td style={{ fontWeight: 600 }}>{toggle}</td>
+                      <td style={{ color: '#aaa', fontSize: 12 }}>({g.items.length}개 항목)</td>
+                      <td className={isIncome ? 'amount-positive' : 'amount-negative'} style={{ fontWeight: 600 }}>
+                        {fmt(g.subtotal)}
                       </td>
+                      <td colSpan={5}></td>
+                    </tr>
+                  );
+                } else {
+                  g.items.forEach((row, idx) => {
+                    out.push(
+                      <tr key={row.id}>
+                        {!catRendered && catCell()}
+                        {idx === 0 && (
+                          <td rowSpan={g.items.length} style={{ fontWeight: 600, verticalAlign: 'top' }}>
+                            {toggle}
+                            <div style={{ color: '#888', fontSize: 11, marginTop: 2, marginLeft: 16 }}>
+                              소계 {fmt(g.subtotal)}
+                            </div>
+                          </td>
+                        )}
+                        <td>{nameById(row.subcategoryCode)}</td>
+                        <td className={isIncome ? 'amount-positive' : 'amount-negative'}>{fmt(row.amount)}</td>
+                        <td>{row.transactionDay ? `${row.transactionDay}일` : ''}</td>
+                        <td style={{ color: '#888', fontSize: 12 }}>{row.billingDay ? `청구일 ${row.billingDay}일` : ''}</td>
+                        <td>{row.orgCode ? nameById(row.orgCode) : ''}</td>
+                        <td style={{ color: '#888' }}>{row.note}</td>
+                        <td>
+                          <button className="btn btn-edit" onClick={() => openEdit(row)} style={{ marginRight: 4 }}>수정</button>
+                          <button className="btn btn-danger" onClick={() => handleDelete(row.id)}>삭제</button>
+                        </td>
+                      </tr>
                     );
-                  })()}
-                  <td>{nameById(row.subcategoryCode)}</td>
-                  <td className={cat.cdId === INCOME ? 'amount-positive' : 'amount-negative'}>
-                    {fmt(row.amount)}
-                  </td>
-                  <td>{row.transactionDay ? `${row.transactionDay}일` : ''}</td>
-                  <td style={{ color: '#888', fontSize: 12 }}>{row.billingDay ? `청구일 ${row.billingDay}일` : ''}</td>
-                  <td>{row.orgCode ? nameById(row.orgCode) : ''}</td>
-                  <td style={{ color: '#888' }}>{row.note}</td>
-                  <td>
-                    <button className="btn btn-edit" onClick={() => openEdit(row)} style={{ marginRight: 4 }}>수정</button>
-                    <button className="btn btn-danger" onClick={() => handleDelete(row.id)}>삭제</button>
-                  </td>
-                </tr>
-              )).concat(
+                  });
+                }
+              });
+
+              // 대분류 소계
+              out.push(
                 <tr key={`sum-${cat.cdId}`} className="summary-row">
                   <td style={{ color: '#555' }} colSpan={2}>소계</td>
-                  <td></td>
-                  <td>{fmt(items.reduce((s, r) => s + (r.amount || 0), 0))}</td>
+                  <td className={isIncome ? 'amount-positive' : 'amount-negative'} style={{ fontWeight: 700 }}>{fmt(catTotal)}</td>
                   <td colSpan={5}></td>
                 </tr>
               );
+              return out;
             })}
           </tbody>
         </table>
