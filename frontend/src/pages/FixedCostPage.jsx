@@ -145,7 +145,7 @@ export default function FixedCostPage() {
               items.map((f, i) => (
                 <tr key={f.id}>
                   {i === 0 && (
-                    <td rowSpan={items.length + 1} style={{ width: 90, whiteSpace: 'nowrap' }}>
+                    <td rowSpan={items.length + 1} style={{ width: 90, whiteSpace: 'nowrap', textAlign: 'center' }}>
                       <span className="category-label" style={{ background: '#ffebee', color: '#c62828' }}>
                         {sc.cdNm}
                       </span>

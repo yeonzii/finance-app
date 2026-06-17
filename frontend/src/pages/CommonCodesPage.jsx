@@ -163,7 +163,7 @@ export default function CommonCodesPage() {
                   style={{ opacity: c.delYn === 'Y' ? 0.4 : 1, cursor: 'pointer' }}
                   title="더블클릭하면 하위 코드를 봅니다"
                 >
-                  <td>
+                  <td style={{ textAlign: 'center' }}>
                     <code style={{ background: '#e8eaf6', padding: '2px 6px', borderRadius: 4, fontSize: 12 }}>
                       {c.cdId}
                     </code>

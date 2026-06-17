@@ -89,7 +89,7 @@ export default function AssetItemsPage() {
                   )}
                   {list.map(it => (
                     <tr key={it.id}>
-                      <td style={{ color: '#888', fontSize: 12 }}>{parentName(it.codeId) || '-'}</td>
+                      <td style={{ color: '#888', fontSize: 12, textAlign: 'center' }}>{parentName(it.codeId) || '-'}</td>
                       <td style={{ fontWeight: 600 }}>{nameById(it.codeId)}</td>
                       <td style={{ textAlign: 'right' }}>
                         <button className="btn btn-danger" onClick={() => handleDelete(it)}>삭제</button>

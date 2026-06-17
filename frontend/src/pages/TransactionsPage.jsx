@@ -159,7 +159,7 @@ export default function TransactionsPage() {
         <table>
           <thead>
             <tr>
-              <th style={{ width: 150 }}>대분류</th><th>중분류</th><th>소분류</th><th>금액</th>
+              <th style={{ width: 150 }}>대분류</th><th style={{ width: 150 }}>중분류</th><th>소분류</th><th>금액</th>
               <th>일자</th><th>청구일</th><th>기관</th><th>메모</th><th></th>
             </tr>
           </thead>
@@ -181,7 +181,7 @@ export default function TransactionsPage() {
               const catCell = () => {
                 catRendered = true;
                 return (
-                  <td rowSpan={catRowSpan} style={{ width: 150, whiteSpace: 'nowrap' }}>
+                  <td rowSpan={catRowSpan} style={{ width: 150, whiteSpace: 'nowrap', textAlign: 'center' }}>
                     <span className="category-label" style={{ background: style.bg, color: style.color }}>
                       {cat.cdNm}
                     </span>
@@ -202,7 +202,7 @@ export default function TransactionsPage() {
                   out.push(
                     <tr key={`${cat.cdId}-${g.midId}`} style={{ background: '#fcfcfd' }}>
                       {!catRendered && catCell()}
-                      <td style={{ fontWeight: 600 }}>{toggle}</td>
+                      <td style={{ fontWeight: 600, textAlign: 'center' }}>{toggle}</td>
                       <td style={{ color: '#aaa', fontSize: 12 }}>({g.items.length}개 항목)</td>
                       <td className={isIncome ? 'amount-positive' : 'amount-negative'} style={{ fontWeight: 600 }}>
                         {fmt(g.subtotal)}
@@ -216,9 +216,9 @@ export default function TransactionsPage() {
                       <tr key={row.id}>
                         {!catRendered && catCell()}
                         {idx === 0 && (
-                          <td rowSpan={g.items.length} style={{ fontWeight: 600, verticalAlign: 'top' }}>
+                          <td rowSpan={g.items.length} style={{ fontWeight: 600, verticalAlign: 'top', textAlign: 'center' }}>
                             {toggle}
-                            <div style={{ color: '#888', fontSize: 11, marginTop: 2, marginLeft: 16 }}>
+                            <div style={{ color: '#888', fontSize: 11, marginTop: 2 }}>
                               소계 {fmt(g.subtotal)}
                             </div>
                           </td>
