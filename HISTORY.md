@@ -169,6 +169,56 @@ JDBC URL : `jdbc:h2:file:./data/financedb`
 
 ---
 
+### 6단계 — MySQL(Docker) 전환
+
+- H2 파일 DB → **Docker MySQL**로 전환 (`docker-compose.yml`)
+- `pom.xml` H2 제거, `application.properties` MySQL 연결
+- 접속: `localhost:3306` / DB `financedb` / `finance` 계정
+
+### 7단계 — 공통코드 TB_CODE 재설계 (계층형)
+
+- `common_codes` → **`TB_CODE`**, PK를 **varchar(`CD_ID`)** 로 변경
+- 코드체계 `CD + 4자리` `[대분류][중분류][소분류][세부]`, ROOT(CD0000) 도입
+- `codeGroup` 제거 → `CD_LEVEL` + `PARENT_CD_ID` 자기참조 계층
+- 공통코드 관리 화면: **드릴다운**(더블클릭) + 브레드크럼 + **ID 자동채번**
+- 레벨4(세부항목)까지 지원
+
+### 8단계 — TB_TRANSACTION 재설계
+
+- `transactions` → **`TB_TRANSACTION`**, PK를 의미있는 varchar로
+- ID 규칙: `TR + 년 + 월(2) + 분류코드숫자` (예: `TR2026062143`)
+- 소득/지출 내역: **대분류 → 중분류 → 소분류** 3단계, 중분류 병합 + 펼치기/접기
+
+### 9단계 — 고정비 관리
+
+- `FixedCost` 엔티티: 고정비 항목(분류·세부항목·금액·기관) 등록
+- 소득/지출 내역에서 **해당 월 진입 시 거래 자동 생성** (중복 방지: `fixedCostId`)
+- 생성된 거래의 금액은 월별로 수정 가능
+
+### 10단계 — 자산현황 재구성
+
+- 고정형 와이드 테이블 `asset_snapshots` 폐기
+- **`asset_items`**(구성 항목) + **`asset_values`**(월별 값)로 분리
+- 자산 항목 구성 페이지: 소득(소득코드)/지출·자산(기관·비용코드)별 항목 구성
+- 자산현황: 행=월 / 열=항목 **가로 그리드**, 셀 인라인 입력, 구분합계·수지 자동
+
+### 11단계 — 관련기관 + 결제기관(카드사) 관리
+
+- `TB_CODE.REL_ORG_CD`: 소득/비용/투자 코드에 **관련 기관코드** 연결
+- `PaymentInstitution`: **카드사별 결제일** 관리 (별도 메뉴)
+- 소득/지출·고정비 입력 시 자동채움:
+  - 소분류 선택 → 관련기관 자동 → 카드사면 **결제일** 자동
+  - 기관 종류가 **은행**이면 청구일 입력 시 결제일 동일 세팅
+- 대출 이자 계산식: 일할 → **월할**(`잔액 × 연이자율 ÷ 12`)로 변경
+
+### 12단계 — UI 정리
+
+- 전체 테이블 헤더 중앙정렬, 금액 우측·일자/기관 중앙정렬
+- 명칭: 일자/거래일 → **결제일**, 컬럼 순서 청구일→기관→결제일
+- 소득/지출·고정비 모달 재구성 (대분류/중분류/소분류, 금액/청구일, 기관종류/기관명/결제일 한 줄씩)
+
+---
+
 ## 현재 등록된 이자율
 
 | 구간 | 연이자율 | 비고 |
@@ -181,16 +231,25 @@ JDBC URL : `jdbc:h2:file:./data/financedb`
 
 ## API 목록
 
-### 공통코드
+### 공통코드 (TB_CODE)
 | Method | URL | 설명 |
 |--------|-----|------|
 | GET | `/api/codes` | 전체 코드 목록 |
-| GET | `/api/codes/group/{group}` | 그룹별 활성 코드 |
-| GET | `/api/codes/children/{parentId}` | 하위 코드 목록 |
-| POST | `/api/codes` | 코드 추가 |
-| PUT | `/api/codes/{id}` | 코드 수정 |
-| DELETE | `/api/codes/{id}` | 소프트 삭제 |
-| PUT | `/api/codes/{id}/restore` | 복구 |
+| GET | `/api/codes/children/{parentCdId}` | 하위 코드 목록 |
+| GET | `/api/codes/level/{level}` | 레벨별 코드 |
+| POST | `/api/codes` | 코드 추가 (REL_ORG_CD 포함) |
+| PUT | `/api/codes/{cdId}` | 코드 수정 |
+| DELETE | `/api/codes/{cdId}` | 소프트 삭제 |
+| PUT | `/api/codes/{cdId}/restore` | 복구 |
+
+### 고정비 / 자산구성 / 결제기관
+| Method | URL | 설명 |
+|--------|-----|------|
+| GET/POST/PUT/DELETE | `/api/fixed-costs` | 고정비 CRUD |
+| POST | `/api/fixed-costs/generate?year=&month=` | 월별 거래 자동생성 |
+| GET/POST/PUT/DELETE | `/api/asset-items` | 자산 구성항목 CRUD |
+| GET/POST | `/api/asset-values?year=` | 자산 월별 값 (upsert) |
+| GET/POST | `/api/payment-institutions` | 카드사 결제일 (upsert) |
 
 ### 거래내역
 | Method | URL | 설명 |
@@ -231,26 +290,35 @@ JDBC URL : `jdbc:h2:file:./data/financedb`
 
 ```
 finance-app/
+├── docker-compose.yml                   # MySQL 컨테이너
 ├── backend/
 │   └── src/main/java/com/finance/app/
 │       ├── entity/
-│       │   ├── Transaction.java         # 거래내역
-│       │   ├── AssetSnapshot.java       # 자산현황
+│       │   ├── Transaction.java         # 거래내역 (TB_TRANSACTION)
+│       │   ├── FixedCost.java           # 고정비 템플릿
+│       │   ├── AssetItem.java           # 자산 구성항목
+│       │   ├── AssetValue.java          # 자산 월별 값
 │       │   ├── LoanPlan.java            # 대출계획
 │       │   ├── LoanInterestRate.java    # 이자율 히스토리
-│       │   └── CommonCode.java          # 공통코드
-│       ├── repository/                  # JPA Repository (DB 접근)
+│       │   ├── PaymentInstitution.java  # 카드사 결제일
+│       │   └── CommonCode.java          # 공통코드 (TB_CODE, REL_ORG_CD)
+│       ├── repository/                  # JPA Repository
 │       ├── service/
-│       │   └── LoanService.java         # 이자 계산 로직
-│       └── controller/                  # REST API 엔드포인트
+│       │   ├── LoanService.java         # 이자 계산 (월할)
+│       │   ├── TransactionService.java  # 거래 ID 생성
+│       │   └── FixedCostService.java    # 고정비 → 거래 자동생성
+│       └── controller/                  # REST API
 │
 └── frontend/
     └── src/
         ├── api/index.js                 # 백엔드 API 호출 함수
         ├── pages/
         │   ├── TransactionsPage.jsx     # 소득/지출 내역
-        │   ├── AssetsPage.jsx           # 자산 현황
+        │   ├── FixedCostPage.jsx        # 고정비 관리
+        │   ├── AssetsPage.jsx           # 자산 현황 (가로 그리드)
+        │   ├── AssetItemsPage.jsx       # 자산 항목 구성
         │   ├── LoanPage.jsx             # 대출 상환 계획 + 이자율
+        │   ├── PaymentInstitutionsPage.jsx # 결제기관 관리
         │   └── CommonCodesPage.jsx      # 공통코드 관리
         └── App.jsx                      # 탭 라우팅
 ```

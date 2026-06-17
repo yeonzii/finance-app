@@ -8,18 +8,21 @@
 ```mermaid
 erDiagram
     TB_CODE ||--o{ TB_CODE : "parent_cd_id (계층구조)"
+    TB_CODE ||--o{ TB_CODE : "rel_org_cd (관련기관, FK 아님)"
     TB_CODE ||..o{ TB_TRANSACTION : "코드값 참조 (FK 아님)"
     TB_CODE ||..o{ FIXED_COSTS : "코드값 참조 (FK 아님)"
     TB_CODE ||..o{ ASSET_ITEMS : "코드값 참조 (FK 아님)"
+    TB_CODE ||..o{ PAYMENT_INSTITUTIONS : "code_id (카드사 참조)"
     FIXED_COSTS ||..o{ TB_TRANSACTION : "fixed_cost_id (자동생성 추적)"
     ASSET_ITEMS ||--o{ ASSET_VALUES : "asset_item_id (월별 값)"
 
     TB_CODE {
         varchar CD_ID PK "공통코드ID (예:CD2110)"
         varchar CD_NM "공통코드명 (예:통신비)"
-        int CD_LEVEL "코드레벨 (0=ROOT~3=소분류)"
+        int CD_LEVEL "코드레벨 (0=ROOT~4=세부항목)"
         varchar PARENT_CD_ID FK "부모코드ID (NULL=ROOT)"
         int SORT_ORDER "정렬순서"
+        varchar REL_ORG_CD "관련 기관코드 (기관분류 참조, 선택)"
         varchar DEL_YN "소프트삭제 N/Y"
     }
 
@@ -30,7 +33,7 @@ erDiagram
         varchar category_code "대분류 코드값"
         varchar subcategory_code "소분류 코드값"
         bigint amount "금액"
-        int transaction_day "거래일"
+        int transaction_day "결제일"
         int billing_day "청구일"
         varchar org_code "기관 코드값"
         varchar note "메모"
@@ -44,10 +47,16 @@ erDiagram
         varchar item_name "항목명 (예:SKT 휴대폰)"
         bigint amount "기본 월 금액"
         varchar org_code "기관 코드값"
-        int transaction_day "거래일"
+        int transaction_day "결제일"
         int billing_day "청구일"
         varchar note "메모"
         varchar del_yn "소프트삭제 N/Y"
+    }
+
+    PAYMENT_INSTITUTIONS {
+        bigint id PK
+        varchar code_id UK "카드사 코드 (기관분류>카드사 CD31xx)"
+        int payment_day "결제일 (1~31)"
     }
 
     ASSET_ITEMS {
@@ -99,9 +108,10 @@ erDiagram
 ### 1. `TB_CODE` — 공통코드 (중심 테이블)
 모든 분류값을 코드로 관리. **자기참조(self-reference)** 계층 구조.
 
-**코드체계**: `CD` + 4자리 `[대분류][중분류][소분류][예비]`
+**코드체계**: `CD` + 4자리 `[대분류][중분류][소분류][세부]`
 - `CD0000` = ROOT (L0)
-- `CD1000` = 소득 (L1) / `CD2100` = 고정비용 (L2) / `CD2110` = 통신비 (L3)
+- `CD1000` = 소득 (L1) / `CD2100` = 고정비용 (L2) / `CD2110` = 통신비 (L3) / `CD2111` = 세부항목 (L4)
+- `REL_ORG_CD`: 소득/비용/투자 코드에 **관련 기관코드** 연결 → 거래 입력 시 기관 자동채움
 
 ```
 CD0000 ROOT
@@ -135,10 +145,14 @@ CD0000 ROOT
 구성항목 × 년 × 월 단위의 금액. `(asset_item_id, tx_year, tx_month)` 복합 유니크.
 > 기존 고정형 와이드 테이블 `asset_snapshots`를 대체 (항목을 컬럼이 아닌 행으로 동적 구성).
 
-### 6. `loan_plans` — 대출 월별 상환계획
+### 6. `payment_institutions` — 결제기관(카드사) 결제일
+기관분류>카드사 코드(`code_id`)별 결제일 관리. 소득/지출·고정비 입력 시 카드사 선택하면
+이 결제일이 **결제일자(transaction_day)** 로 자동 채워짐. `code_id` 유니크.
+
+### 7. `loan_plans` — 대출 월별 상환계획
 `applied_rate`에 그 달 적용 이자율을 **스냅샷처럼 보존** (이자율이 나중에 바뀌어도 과거 기록 유지).
 
-### 7. `loan_interest_rates` — 이자율 히스토리
+### 8. `loan_interest_rates` — 이자율 히스토리
 구간(`start ~ end`)별 연이자율. `end`가 NULL이면 현재까지 유효.
 
 ---
@@ -150,6 +164,8 @@ CD0000 ROOT
 | 관계 | 방식 | 이유 |
 |------|------|------|
 | `TB_CODE` → `TB_CODE` | `PARENT_CD_ID`로 자기참조 | 계층 구조 표현 |
+| `TB_CODE` → `TB_CODE` | `REL_ORG_CD`로 관련기관 연결 | 거래 입력 시 기관 자동채움 |
+| `payment_institutions` → `TB_CODE` | `code_id`로 카드사 참조 | 카드사별 결제일 매핑 |
 | `TB_TRANSACTION` → `TB_CODE` | `category_code` 등 **코드값(CD_ID)** 으로 참조 | 코드 추가/삭제 유연성, 소프트삭제와 궁합 |
 | `TB_TRANSACTION` → `fixed_costs` | `fixed_cost_id`로 출처 추적 | 월별 중복 생성 방지, 자동 생성 거래 식별 |
 | `asset_items` → `TB_CODE` | `code_id`로 **코드값** 참조 | 자산현황 행을 코드 기반으로 동적 구성 |
