@@ -43,6 +43,10 @@ public class CommonCode {
     @Column(name = "SORT_ORDER")
     private Integer sortOrder;
 
+    // 관련 기관코드 (기관분류 CD3xxx 참조, 선택). 소득/비용/투자 코드에 연결
+    @Column(name = "REL_ORG_CD", length = 10)
+    private String relOrgCd;
+
     // 소프트삭제: N=정상, Y=삭제
     @Column(name = "DEL_YN", nullable = false, length = 1)
     private String delYn = "N";

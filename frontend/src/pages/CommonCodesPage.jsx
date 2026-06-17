@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { getAllCodes, createCode, updateCode, deleteCode, restoreCode } from '../api';
 
 const ROOT = 'CD0000';
+const ORG_ROOT = 'CD3000'; // 기관분류
 
 // 부모 코드 기준 다음 자식 코드ID 자동 채번
 // 코드체계: CD + 4자리, 부모 레벨 위치의 자리값을 증가시킨다.
@@ -39,6 +40,35 @@ export default function CommonCodesPage() {
     .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
 
   const hasChildren = (cdId) => allCodes.some(c => c.parentCdId === cdId && c.delYn === 'N');
+  const nameById = (cdId) => allCodes.find(c => c.cdId === cdId)?.cdNm ?? cdId ?? '';
+
+  // 기관분류(CD3000) 말단 코드 목록 (관련기관 선택지)
+  const orgLeaves = (() => {
+    const active = allCodes.filter(c => c.delYn === 'N');
+    const childrenOf = (pid) => active.filter(c => c.parentCdId === pid);
+    const leaves = (pid) => {
+      const kids = childrenOf(pid);
+      return kids.length === 0 ? [] : kids.flatMap(k => {
+        const g = leaves(k.cdId);
+        return g.length ? g : [k];
+      });
+    };
+    return leaves(ORG_ROOT);
+  })();
+  const orgParentName = (cdId) => {
+    const n = allCodes.find(c => c.cdId === cdId);
+    return n ? (allCodes.find(p => p.cdId === n.parentCdId)?.cdNm ?? '') : '';
+  };
+
+  // 기관분류 트리(CD3000 하위) 안에 있으면 관련기관 설정 대상 아님
+  const isUnderOrg = (cdId) => {
+    let n = allCodes.find(c => c.cdId === cdId);
+    while (n) {
+      if (n.cdId === ORG_ROOT) return true;
+      n = allCodes.find(c => c.cdId === n.parentCdId);
+    }
+    return false;
+  };
 
   // 현재 부모 노드 (ROOT면 가상 노드)
   const currentNode = currentParent === ROOT
@@ -66,13 +96,17 @@ export default function CommonCodesPage() {
     const nextSort = siblings.reduce((m, c) => Math.max(m, c.sortOrder ?? 0), 0) + 1;
     setModal({
       mode: 'add',
-      data: { cdId: newId, cdNm: '', cdLevel: parentLevel + 1, parentCdId: currentParent, sortOrder: nextSort, delYn: 'N' },
+      data: { cdId: newId, cdNm: '', cdLevel: parentLevel + 1, parentCdId: currentParent, sortOrder: nextSort, delYn: 'N', relOrgCd: '' },
       parentName: currentNode?.cdNm ?? 'ROOT',
+      showRelOrg: currentParent !== ROOT && !isUnderOrg(currentParent),
     });
   };
   const openEdit = (row) => {
     const parent = allCodes.find(c => c.cdId === row.parentCdId);
-    setModal({ mode: 'edit', data: { ...row }, parentName: parent?.cdNm ?? 'ROOT' });
+    setModal({
+      mode: 'edit', data: { ...row }, parentName: parent?.cdNm ?? 'ROOT',
+      showRelOrg: row.parentCdId && row.parentCdId !== ROOT && !isUnderOrg(row.cdId),
+    });
   };
   const closeModal = () => setModal(null);
 
@@ -144,6 +178,7 @@ export default function CommonCodesPage() {
             <tr>
               <th>공통코드ID</th>
               <th>공통코드명</th>
+              <th>관련기관</th>
               <th style={{ textAlign: 'center' }}>레벨</th>
               <th style={{ textAlign: 'center' }}>순서</th>
               <th style={{ textAlign: 'center' }}>상태</th>
@@ -152,7 +187,7 @@ export default function CommonCodesPage() {
           </thead>
           <tbody>
             {rows.length === 0 && (
-              <tr><td colSpan={6} className="empty-state">하위 코드가 없어요. <b>+ 하위코드 추가</b>로 등록해보세요.</td></tr>
+              <tr><td colSpan={7} className="empty-state">하위 코드가 없어요. <b>+ 하위코드 추가</b>로 등록해보세요.</td></tr>
             )}
             {rows.map(c => {
               const drillable = hasChildren(c.cdId);
@@ -171,6 +206,9 @@ export default function CommonCodesPage() {
                   <td style={{ fontWeight: 600 }}>
                     {c.cdNm}
                     {drillable && <span style={{ color: '#3949ab', marginLeft: 6, fontSize: 12 }}>▸ 하위</span>}
+                  </td>
+                  <td style={{ color: '#666', fontSize: 12, textAlign: 'center' }}>
+                    {c.relOrgCd ? `${orgParentName(c.relOrgCd)} > ${nameById(c.relOrgCd)}` : '-'}
                   </td>
                   <td style={{ color: '#999', textAlign: 'center' }}>{c.cdLevel}</td>
                   <td style={{ color: '#999', textAlign: 'center' }}>{c.sortOrder}</td>
@@ -202,13 +240,14 @@ export default function CommonCodesPage() {
       </div>
 
       {modal && (
-        <CodeModal modal={modal} onSave={handleSave} onClose={closeModal} />
+        <CodeModal modal={modal} orgLeaves={orgLeaves} orgParentName={orgParentName}
+                   onSave={handleSave} onClose={closeModal} />
       )}
     </div>
   );
 }
 
-function CodeModal({ modal, onSave, onClose }) {
+function CodeModal({ modal, orgLeaves, orgParentName, onSave, onClose }) {
   const [form, setForm] = useState(modal.data);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -232,6 +271,19 @@ function CodeModal({ modal, onSave, onClose }) {
             <label>정렬순서</label>
             <input type="number" value={form.sortOrder} onChange={e => set('sortOrder', +e.target.value)} />
           </div>
+          {modal.showRelOrg && (
+            <div className="form-group full">
+              <label>관련 기관 (선택)</label>
+              <select value={form.relOrgCd || ''} onChange={e => set('relOrgCd', e.target.value || null)}>
+                <option value="">없음</option>
+                {orgLeaves.map(o => (
+                  <option key={o.cdId} value={o.cdId}>
+                    {orgParentName(o.cdId) ? `${orgParentName(o.cdId)} > ${o.cdNm}` : o.cdNm}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
         <div className="modal-actions">
           <button className="btn btn-cancel" onClick={onClose}>취소</button>
