@@ -48,6 +48,14 @@ export default function TransactionsPage() {
       return grand.length ? grand : [k];
     });
   };
+  // 말단(leaf) 코드에서 대분류(top)의 직속 자식(=중분류) 코드ID 도출
+  const middleOf = (leafCdId, topCdId) => {
+    let cur = codes.find(c => c.cdId === leafCdId);
+    while (cur && cur.parentCdId && cur.parentCdId !== topCdId) {
+      cur = codes.find(c => c.cdId === cur.parentCdId);
+    }
+    return cur?.cdId ?? '';
+  };
 
   // 거래 대분류 = ROOT의 자식 중 기관분류 제외 (소득/비용/투자)
   const categories = childrenOf(ROOT).filter(c => c.cdId !== ORG_ROOT);
@@ -131,13 +139,13 @@ export default function TransactionsPage() {
         <table>
           <thead>
             <tr>
-              <th>대분류</th><th>항목</th><th>금액</th>
+              <th>대분류</th><th>중분류</th><th>소분류</th><th>금액</th>
               <th>일자</th><th>청구일</th><th>기관</th><th>메모</th><th></th>
             </tr>
           </thead>
           <tbody>
             {grouped.length === 0 && (
-              <tr><td colSpan={8} className="empty-state">이 달의 데이터가 없어요.</td></tr>
+              <tr><td colSpan={9} className="empty-state">이 달의 데이터가 없어요.</td></tr>
             )}
             {grouped.map(({ cat, items }) => {
               const style = catStyle(cat.cdId);
@@ -150,6 +158,14 @@ export default function TransactionsPage() {
                       </span>
                     </td>
                   )}
+                  {(() => {
+                    const mid = middleOf(row.subcategoryCode, cat.cdId);
+                    return (
+                      <td style={{ color: '#666' }}>
+                        {mid && mid !== row.subcategoryCode ? nameById(mid) : '-'}
+                      </td>
+                    );
+                  })()}
                   <td>{nameById(row.subcategoryCode)}</td>
                   <td className={cat.cdId === INCOME ? 'amount-positive' : 'amount-negative'}>
                     {fmt(row.amount)}
@@ -165,9 +181,10 @@ export default function TransactionsPage() {
                 </tr>
               )).concat(
                 <tr key={`sum-${cat.cdId}`} className="summary-row">
-                  <td style={{ color: '#555' }}>소계</td>
+                  <td style={{ color: '#555' }} colSpan={2}>소계</td>
+                  <td></td>
                   <td>{fmt(items.reduce((s, r) => s + (r.amount || 0), 0))}</td>
-                  <td colSpan={6}></td>
+                  <td colSpan={5}></td>
                 </tr>
               );
             })}
@@ -180,7 +197,9 @@ export default function TransactionsPage() {
           modal={modal}
           categories={categories}
           orgTypes={orgTypes}
+          childrenOf={childrenOf}
           leafDescendants={leafDescendants}
+          middleOf={middleOf}
           onSave={handleSave}
           onClose={closeModal}
         />
@@ -189,12 +208,23 @@ export default function TransactionsPage() {
   );
 }
 
-function TransactionModal({ modal, categories, orgTypes, leafDescendants, onSave, onClose }) {
+function TransactionModal({ modal, categories, orgTypes, childrenOf, leafDescendants, middleOf, onSave, onClose }) {
   const [form, setForm] = useState(modal.data);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
-  // 선택한 대분류의 말단 항목들
-  const subcodes = form.categoryCode ? leafDescendants(form.categoryCode) : [];
+  // 중분류: 대분류의 직속 자식. 수정 시 기존 소분류로부터 역추적
+  const [middle, setMiddle] = useState(
+    modal.data.subcategoryCode ? middleOf(modal.data.subcategoryCode, modal.data.categoryCode) : ''
+  );
+  const middleOptions = form.categoryCode ? childrenOf(form.categoryCode) : [];
+  const subcodes = middle ? leafDescendants(middle) : []; // 선택한 중분류의 말단 항목
+
+  const onChangeCategory = (v) => { set('categoryCode', v); setMiddle(''); set('subcategoryCode', ''); };
+  const onChangeMiddle = (v) => {
+    setMiddle(v);
+    const leaves = v ? leafDescendants(v) : [];
+    set('subcategoryCode', leaves.length === 0 ? v : ''); // 중분류가 말단이면 그것이 곧 소분류
+  };
 
   // 기관 종류 선택 → 해당 기관들
   const [selectedOrgType, setSelectedOrgType] = useState('');
@@ -215,15 +245,23 @@ function TransactionModal({ modal, categories, orgTypes, leafDescendants, onSave
           </div>
           <div className="form-group">
             <label>대분류</label>
-            <select value={form.categoryCode} onChange={e => { set('categoryCode', e.target.value); set('subcategoryCode', ''); }}>
+            <select value={form.categoryCode} onChange={e => onChangeCategory(e.target.value)}>
               <option value="">선택</option>
               {categories.map(c => <option key={c.cdId} value={c.cdId}>{c.cdNm}</option>)}
             </select>
           </div>
           <div className="form-group">
-            <label>소분류</label>
-            <select value={form.subcategoryCode} onChange={e => set('subcategoryCode', e.target.value)} disabled={!form.categoryCode}>
+            <label>중분류</label>
+            <select value={middle} onChange={e => onChangeMiddle(e.target.value)} disabled={!form.categoryCode}>
               <option value="">선택</option>
+              {middleOptions.map(c => <option key={c.cdId} value={c.cdId}>{c.cdNm}</option>)}
+            </select>
+          </div>
+          <div className="form-group">
+            <label>소분류</label>
+            <select value={form.subcategoryCode} onChange={e => set('subcategoryCode', e.target.value)}
+                    disabled={!middle || subcodes.length === 0}>
+              <option value="">{subcodes.length === 0 && middle ? '(중분류가 말단)' : '선택'}</option>
               {subcodes.map(c => <option key={c.cdId} value={c.cdId}>{c.cdNm}</option>)}
             </select>
           </div>
