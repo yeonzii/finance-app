@@ -3,6 +3,7 @@ import TransactionsPage from './pages/TransactionsPage';
 import AssetsPage from './pages/AssetsPage';
 import LoanPage from './pages/LoanPage';
 import FixedCostPage from './pages/FixedCostPage';
+import AssetItemsPage from './pages/AssetItemsPage';
 import CommonCodesPage from './pages/CommonCodesPage';
 import './App.css';
 
@@ -10,6 +11,7 @@ const TABS = [
   { key: 'transactions', label: '💰 소득/지출 내역' },
   { key: 'fixed', label: '📌 고정비 관리' },
   { key: 'assets', label: '📊 자산 현황' },
+  { key: 'assetItems', label: '🧩 자산 항목 구성' },
   { key: 'loans', label: '🏦 대출 상환 계획' },
   { key: 'codes', label: '⚙️ 공통코드 관리' },
 ];
@@ -37,6 +39,7 @@ export default function App() {
         {tab === 'transactions' && <TransactionsPage />}
         {tab === 'fixed' && <FixedCostPage />}
         {tab === 'assets' && <AssetsPage />}
+        {tab === 'assetItems' && <AssetItemsPage />}
         {tab === 'loans' && <LoanPage />}
         {tab === 'codes' && <CommonCodesPage />}
       </main>

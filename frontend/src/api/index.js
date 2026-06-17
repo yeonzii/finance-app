@@ -57,6 +57,19 @@ export const deleteFixedCost = (id) =>
 export const generateFixedCosts = (year, month) =>
   api.post('/fixed-costs/generate', null, { params: { year, month } }).then(r => r.data);
 
+// ── 자산 항목 구성 ────────────────────────────────
+export const getAssetItems = () =>
+  api.get('/asset-items').then(r => r.data);
+
+export const createAssetItem = (data) =>
+  api.post('/asset-items', data).then(r => r.data);
+
+export const updateAssetItem = (id, data) =>
+  api.put(`/asset-items/${id}`, data).then(r => r.data);
+
+export const deleteAssetItem = (id) =>
+  api.delete(`/asset-items/${id}`);
+
 // ── 자산현황 ──────────────────────────────────────
 export const getAssets = (year) =>
   api.get('/assets', { params: { year } }).then(r => r.data);
