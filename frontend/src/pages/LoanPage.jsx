@@ -209,6 +209,7 @@ function PlanTab({ plans, getRateForMonth, latestBalance, totalRepaid, totalInte
               <th style={{ color: '#1a237e' }}>적용 이자율</th>
               <th style={{ color: '#e65100' }}>이자금액 (27일)</th>
               <th>정기 상환액</th>
+              <th style={{ color: '#1a237e' }}>총 원리금상환액</th>
               <th>추가 상환액</th>
               <th>상환 후 잔액</th>
               <th></th>
@@ -216,7 +217,7 @@ function PlanTab({ plans, getRateForMonth, latestBalance, totalRepaid, totalInte
           </thead>
           <tbody>
             {plans.length === 0 && (
-              <tr><td colSpan={8} className="empty-state">상환 내역이 없어요. 먼저 이자율을 등록하고 월을 추가해보세요.</td></tr>
+              <tr><td colSpan={9} className="empty-state">상환 내역이 없어요. 먼저 이자율을 등록하고 월을 추가해보세요.</td></tr>
             )}
             {plans.map(p => {
               const rateInfo = getRateForMonth(p.year, p.month);
@@ -242,6 +243,7 @@ function PlanTab({ plans, getRateForMonth, latestBalance, totalRepaid, totalInte
                     </span>
                   </td>
                   <td className="col-r">{fmt(p.repaymentAmount)}</td>
+                  <td className="col-r" style={{ fontWeight: 700, color: '#1a237e' }}>{fmt((p.interestAmount || 0) + (p.repaymentAmount || 0))}</td>
                   <td className="col-r" style={{ color: '#2e7d32' }}>{p.extraPayment ? fmt(p.extraPayment) : '-'}</td>
                   <td className="col-r" style={{ fontWeight: 700, color: '#c62828' }}>{fmt(p.remainingBalance)}</td>
                   <td>
@@ -258,6 +260,7 @@ function PlanTab({ plans, getRateForMonth, latestBalance, totalRepaid, totalInte
                 <td className="col-c">-</td>
                 <td className="col-r" style={{ color: '#e65100' }}>{fmt(totalInterest)}</td>
                 <td className="col-r">{fmt(plans.reduce((s, r) => s + (r.repaymentAmount || 0), 0))}</td>
+                <td className="col-r" style={{ fontWeight: 700, color: '#1a237e' }}>{fmt(plans.reduce((s, r) => s + (r.interestAmount || 0) + (r.repaymentAmount || 0), 0))}</td>
                 <td className="col-r">{fmt(plans.reduce((s, r) => s + (r.extraPayment || 0), 0))}</td>
                 <td className="col-c">-</td>
                 <td></td>
