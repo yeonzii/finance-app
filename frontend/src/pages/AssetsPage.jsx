@@ -3,6 +3,7 @@ import { getAssetItems, getAssetValues, saveAssetValue, getAllCodes, getTransact
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1);
 const fmt = (n) => n != null && n !== '' ? Number(n).toLocaleString('ko-KR') : '';
+const CARDVALUE = 'CD2210'; // 가변비용 > 카드값
 
 const TYPES = [
   { key: 'INCOME',  label: '소득', color: '#2e7d32', bg: '#e8f5e9' },
@@ -92,7 +93,9 @@ export default function AssetsPage() {
       return txSum(item.codeId, year, month); // 같은 년월
     }
     if (item.assetType === 'EXPENSE') {
-      const m = month + 1;                     // 다음 달 지출
+      // 카드값: 다음 달 거래 → 자산 당월 / 그 외 비용: 당월 거래
+      const isCard = inSubtree(item.codeId, CARDVALUE);
+      const m = isCard ? month + 1 : month;
       const ty = m > 12 ? year + 1 : year;
       const tm = m > 12 ? 1 : m;
       return txSum(item.codeId, ty, tm);
@@ -147,7 +150,7 @@ export default function AssetsPage() {
       </div>
 
       <div style={{ fontSize: 12, color: '#888', marginBottom: 12 }}>
-        💡 <b>소득·지출</b> 행은 소득/지출 내역에서 자동 계산돼요 (소득=같은 달, 지출=다음 달 항목). <b>자산</b> 행만 셀에 직접 입력합니다.
+        💡 <b>소득·지출</b> 행은 소득/지출 내역에서 자동 계산돼요 (소득=같은 달, 지출은 카드값=다음 달·그 외=당월). <b>자산</b> 행만 셀에 직접 입력합니다.
       </div>
 
       {!hasItems ? (
