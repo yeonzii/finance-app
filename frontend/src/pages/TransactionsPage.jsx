@@ -420,7 +420,16 @@ function TransactionModal({ modal, categories, orgTypes, childrenOf, leafDescend
         <div className="form-grid">
           <div className="form-group">
             <label>금액</label>
-            <input type="number" value={form.amount} onChange={e => set('amount', +e.target.value)} placeholder="0" />
+            <input
+              type="text"
+              inputMode="numeric"
+              value={form.amount === '' || form.amount == null ? '' : Number(form.amount).toLocaleString('ko-KR')}
+              onChange={e => {
+                const raw = e.target.value.replace(/[^0-9]/g, '');
+                set('amount', raw === '' ? '' : +raw);
+              }}
+              placeholder="0"
+            />
           </div>
           <div className="form-group">
             <label>청구일</label>
