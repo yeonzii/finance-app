@@ -2,6 +2,7 @@ package com.finance.app.controller;
 
 import com.finance.app.entity.LoanPlan;
 import com.finance.app.entity.Transaction;
+import com.finance.app.repository.CommonCodeRepository;
 import com.finance.app.repository.LoanPlanRepository;
 import com.finance.app.repository.TransactionRepository;
 import com.finance.app.service.LoanService;
@@ -22,6 +23,7 @@ public class LoanPlanController {
     private final LoanService loanService;
     private final TransactionRepository txRepo;
     private final TransactionService txService;
+    private final CommonCodeRepository codeRepo;
 
     // 비용 대분류 / 원리금상환·원금추가상환 코드
     private static final String EXPENSE = "CD2000";
@@ -103,6 +105,9 @@ public class LoanPlanController {
         t.setSubcategoryCode(subCd);
         t.setAmount(amount);
         t.setNote(note);
+        // 코드의 관련기관(REL_ORG_CD)을 기관으로 반영 (예: 새마을금고)
+        String orgCd = codeRepo.findById(subCd).map(c -> c.getRelOrgCd()).orElse(null);
+        if (orgCd != null && !orgCd.isBlank()) t.setOrgCode(orgCd);
         t.setDelYn("N");
         txRepo.save(t);
     }
