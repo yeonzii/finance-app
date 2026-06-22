@@ -252,10 +252,10 @@ function PlanTab({ plans, getRateForMonth, latestBalance, totalRepaid, totalInte
                   <td className="col-r" style={{ color: '#2e7d32' }}>{p.extraPayment ? fmt(p.extraPayment) : '-'}</td>
                   <td className="col-r" style={{ fontWeight: 700, color: '#c62828' }}>{fmt(p.remainingBalance)}</td>
                   <td style={{ whiteSpace: 'nowrap' }}>
-                    <button className="btn" style={{ marginRight: 4, background: '#1a237e', color: '#fff' }}
-                            onClick={() => onReflect(p)} title="해당 월 소득/지출 내역에 원리금상환·원금추가상환 반영">지출반영</button>
                     <button className="btn btn-edit" onClick={() => onEdit(p)} style={{ marginRight: 4 }}>수정</button>
-                    <button className="btn btn-danger" onClick={() => onDelete(p.id)}>삭제</button>
+                    <button className="btn btn-danger" onClick={() => onDelete(p.id)} style={{ marginRight: 4 }}>삭제</button>
+                    <button className="btn" style={{ background: '#1b5e20', color: '#fff' }}
+                            onClick={() => onReflect(p)} title="해당 월 소득/지출 내역에 원리금상환·원금추가상환 반영">지출반영</button>
                   </td>
                 </tr>
               );
