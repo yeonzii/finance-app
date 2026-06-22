@@ -4,6 +4,7 @@ import { getAssetItems, getAssetValues, saveAssetValue, getAllCodes, getTransact
 const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1);
 const fmt = (n) => n != null && n !== '' ? Number(n).toLocaleString('ko-KR') : '';
 const CARDVALUE = 'CD2210'; // 가변비용 > 카드값
+const NO_SUBTOTAL = ['CD2230']; // 소계 제외 그룹 (대출상환)
 
 const TYPES = [
   { key: 'INCOME',  label: '소득', color: '#2e7d32', bg: '#e8f5e9' },
@@ -143,7 +144,7 @@ export default function AssetsPage() {
       if (!map.has(pc)) { map.set(pc, []); order.push(pc); }
       map.get(pc).push(it);
     });
-    return order.map(pc => ({ key: pc, label: nameById(pc), items: map.get(pc), subtotal: true }));
+    return order.map(pc => ({ key: pc, label: nameById(pc), items: map.get(pc), subtotal: !NO_SUBTOTAL.includes(pc) }));
   };
   const groupMonthTotal = (group, m) => group.items.reduce((s, it) => s + (getVal(it, m) || 0), 0);
   const groupYearTotal = (group) => group.items.reduce((s, it) => s + itemYearTotal(it), 0);
