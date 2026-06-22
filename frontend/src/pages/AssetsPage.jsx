@@ -4,7 +4,7 @@ import { getAssetItems, getAssetValues, saveAssetValue, getAllCodes, getTransact
 const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1);
 const fmt = (n) => n != null && n !== '' ? Number(n).toLocaleString('ko-KR') : '';
 const CARDVALUE = 'CD2210'; // 가변비용 > 카드값
-const NO_SUBTOTAL = ['CD2230']; // 소계 제외 그룹 (대출상환)
+const NO_SUBTOTAL = ['CD2230', 'CD3410']; // 소계 제외 그룹 (대출상환, 미래에셋)
 
 const TYPES = [
   { key: 'INCOME',  label: '소득', color: '#2e7d32', bg: '#e8f5e9' },
@@ -203,7 +203,7 @@ export default function AssetsPage() {
                     cells.push(<th key={`${t.key}-sp`} colSpan={t.list.length} style={{ background: t.bg }}></th>);
                   } else {
                     t.groups.forEach(g => cells.push(
-                      <th key={`${t.key}-${g.key}-g`} colSpan={g.items.length + 1}
+                      <th key={`${t.key}-${g.key}-g`} colSpan={g.items.length + (g.subtotal ? 1 : 0)}
                           style={{ textAlign: 'center', color: t.color, background: t.bg, fontSize: 12 }}>{g.label}</th>
                     ));
                   }
