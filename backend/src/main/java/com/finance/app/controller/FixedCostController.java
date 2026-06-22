@@ -33,7 +33,11 @@ public class FixedCostController {
     @PutMapping("/{id}")
     public FixedCost update(@PathVariable Long id, @RequestBody FixedCost f) {
         f.setId(id);
-        return repo.save(f);
+        f.setDelYn("N");
+        FixedCost saved = repo.save(f);
+        // 변경한 월 다음 달부터의 자동생성 거래만 새 내용으로 갱신 (이전 달은 유지)
+        service.syncFutureTransactions(saved);
+        return saved;
     }
 
     // 소프트 삭제

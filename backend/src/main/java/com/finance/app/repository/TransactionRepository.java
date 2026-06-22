@@ -15,4 +15,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, String
 
     // 특정 월에 이미 생성된 고정비 거래 (삭제 포함, 중복 생성 방지용)
     List<Transaction> findByYearAndMonthAndFixedCostIdIsNotNull(int year, int month);
+
+    // 특정 고정비에서 생성된 모든 거래
+    List<Transaction> findByFixedCostId(Long fixedCostId);
 }
