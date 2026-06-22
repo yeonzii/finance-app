@@ -131,8 +131,30 @@ export default function AssetsPage() {
   })();
   const ytdAssetChange = assetMonthTotal(lastAssetMonth) - assetMonthTotal(1);
 
+  // ── 분류(상위)별 그룹 ────────────────────────────
+  const parentCdOf = (codeId) => codes.find(c => c.cdId === codeId)?.parentCdId ?? '_';
+  // 소득은 그룹소계 없음 / 지출·자산은 상위코드별 그룹 + 소계
+  const buildGroups = (typeKey, list) => {
+    if (typeKey === 'INCOME') return [{ key: '_inc', label: null, items: list, subtotal: false }];
+    const order = [];
+    const map = new Map();
+    list.forEach(it => {
+      const pc = parentCdOf(it.codeId);
+      if (!map.has(pc)) { map.set(pc, []); order.push(pc); }
+      map.get(pc).push(it);
+    });
+    return order.map(pc => ({ key: pc, label: nameById(pc), items: map.get(pc), subtotal: true }));
+  };
+  const groupMonthTotal = (group, m) => group.items.reduce((s, it) => s + (getVal(it, m) || 0), 0);
+  const groupYearTotal = (group) => group.items.reduce((s, it) => s + itemYearTotal(it), 0);
+
   const activeTypes = TYPES
-    .map(t => ({ ...t, list: itemsOf(t.key) }))
+    .map(t => {
+      const list = itemsOf(t.key);
+      const groups = buildGroups(t.key, list);
+      const colCount = groups.reduce((s, g) => s + g.items.length + (g.subtotal ? 1 : 0), 0) + 1;
+      return { ...t, list, groups, colCount };
+    })
     .filter(t => t.list.length > 0);
 
   const hasItems = items.length > 0;
@@ -161,25 +183,52 @@ export default function AssetsPage() {
         <div className="table-wrap" style={{ overflowX: 'auto' }}>
           <table style={{ width: 'max-content', minWidth: '100%' }}>
             <thead>
+              {/* 1단: 타입 */}
               <tr>
-                <th rowSpan={2} style={{ position: 'sticky', left: 0, background: '#e8eaf6', width: 56, minWidth: 56, textAlign: 'center' }}>월</th>
+                <th rowSpan={3} style={{ position: 'sticky', left: 0, background: '#e8eaf6', width: 56, minWidth: 56, textAlign: 'center' }}>월</th>
                 {activeTypes.map(t => (
-                  <th key={t.key} colSpan={t.list.length + 1}
+                  <th key={t.key} colSpan={t.colCount}
                       style={{ textAlign: 'center', color: t.color, background: t.bg }}>
                     {t.label}{t.key !== 'ASSET' && <span style={{ fontWeight: 400, fontSize: 11 }}> (자동)</span>}
                   </th>
                 ))}
-                <th rowSpan={2} style={{ textAlign: 'center', width: 96, minWidth: 96, background: '#fff8e1' }}>수지<br/>(소득-지출)</th>
+                <th rowSpan={3} style={{ textAlign: 'center', width: 96, minWidth: 96, background: '#fff8e1' }}>수지<br/>(소득-지출)</th>
               </tr>
+              {/* 2단: 분류(상위) + 타입합계 */}
               <tr>
-                {activeTypes.flatMap(t => [
-                  ...t.list.map(it => (
-                    <th key={it.id} style={{ textAlign: 'center', width: 96, minWidth: 96 }}>{nameById(it.codeId)}</th>
-                  )),
-                  <th key={`${t.key}-sum`} style={{ textAlign: 'center', width: t.key === 'ASSET' ? 160 : 96, minWidth: t.key === 'ASSET' ? 160 : 96, color: t.color, background: t.bg }}>
-                    {t.label}합계{t.key === 'ASSET' && <span style={{ fontWeight: 400, fontSize: 11 }}> (전월비)</span>}
-                  </th>,
-                ])}
+                {activeTypes.flatMap(t => {
+                  const cells = [];
+                  if (t.key === 'INCOME') {
+                    cells.push(<th key={`${t.key}-sp`} colSpan={t.list.length} style={{ background: t.bg }}></th>);
+                  } else {
+                    t.groups.forEach(g => cells.push(
+                      <th key={`${t.key}-${g.key}-g`} colSpan={g.items.length + 1}
+                          style={{ textAlign: 'center', color: t.color, background: t.bg, fontSize: 12 }}>{g.label}</th>
+                    ));
+                  }
+                  cells.push(
+                    <th key={`${t.key}-sum`} rowSpan={2}
+                        style={{ textAlign: 'center', width: t.key === 'ASSET' ? 160 : 96, minWidth: t.key === 'ASSET' ? 160 : 96, color: t.color, background: t.bg }}>
+                      {t.label}합계{t.key === 'ASSET' && <span style={{ fontWeight: 400, fontSize: 11 }}> (전월비)</span>}
+                    </th>
+                  );
+                  return cells;
+                })}
+              </tr>
+              {/* 3단: 항목명 + 그룹소계 */}
+              <tr>
+                {activeTypes.flatMap(t => {
+                  const cells = [];
+                  t.groups.forEach(g => {
+                    g.items.forEach(it => cells.push(
+                      <th key={it.id} style={{ textAlign: 'center', width: 96, minWidth: 96 }}>{nameById(it.codeId)}</th>
+                    ));
+                    if (g.subtotal) cells.push(
+                      <th key={`${t.key}-${g.key}-st`} style={{ textAlign: 'center', width: 96, minWidth: 96, color: t.color, background: t.bg }}>{g.label} 소계</th>
+                    );
+                  });
+                  return cells;
+                })}
               </tr>
             </thead>
             <tbody>
@@ -188,23 +237,34 @@ export default function AssetsPage() {
                 return (
                   <tr key={m}>
                     <td style={{ position: 'sticky', left: 0, background: '#fff', fontWeight: 600, textAlign: 'center' }}>{m}월</td>
-                    {activeTypes.flatMap(t => [
-                      ...t.list.map(it => (
-                        <td key={it.id} style={{ padding: t.key === 'ASSET' ? 2 : '8px 6px', textAlign: 'right', background: t.key === 'ASSET' ? undefined : '#fcfcfc' }}>
-                          {t.key === 'ASSET'
-                            ? <CellInput value={getVal(it, m)} onCommit={(amt) => commitValue(it, m, amt)} />
-                            : <span style={{ color: getVal(it, m) ? '#333' : '#ccc' }}>{getVal(it, m) ? fmt(getVal(it, m)) : '·'}</span>}
+                    {activeTypes.flatMap(t => {
+                      const cells = [];
+                      t.groups.forEach(g => {
+                        g.items.forEach(it => cells.push(
+                          <td key={it.id} style={{ padding: t.key === 'ASSET' ? 2 : '8px 6px', textAlign: 'right', background: t.key === 'ASSET' ? undefined : '#fcfcfc' }}>
+                            {t.key === 'ASSET'
+                              ? <CellInput value={getVal(it, m)} onCommit={(amt) => commitValue(it, m, amt)} />
+                              : <span style={{ color: getVal(it, m) ? '#333' : '#ccc' }}>{getVal(it, m) ? fmt(getVal(it, m)) : '·'}</span>}
+                          </td>
+                        ));
+                        if (g.subtotal) cells.push(
+                          <td key={`${t.key}-${g.key}-st`} style={{ textAlign: 'right', fontWeight: 600, color: t.color, background: t.bg }}>
+                            {fmt(groupMonthTotal(g, m)) || '·'}
+                          </td>
+                        );
+                      });
+                      cells.push(
+                        <td key={`${t.key}-sum`} style={{ textAlign: 'right', fontWeight: 700, color: t.color, background: t.bg, whiteSpace: 'nowrap' }}>
+                          {fmt(typeMonthTotal(t.key, m)) || '·'}
+                          {t.key === 'ASSET' && m > 1 && assetMonthTotal(m) !== 0 && assetMonthTotal(m - 1) !== 0 && (
+                            <span style={{ marginLeft: 5, fontSize: 11, fontWeight: 600, color: changeColor(assetMonthTotal(m) - assetMonthTotal(m - 1)) }}>
+                              ({fmtSigned(assetMonthTotal(m) - assetMonthTotal(m - 1))})
+                            </span>
+                          )}
                         </td>
-                      )),
-                      <td key={`${t.key}-sum`} style={{ textAlign: 'right', fontWeight: 600, color: t.color, background: t.bg, whiteSpace: 'nowrap' }}>
-                        {fmt(typeMonthTotal(t.key, m)) || '·'}
-                        {t.key === 'ASSET' && m > 1 && assetMonthTotal(m) !== 0 && assetMonthTotal(m - 1) !== 0 && (
-                          <span style={{ marginLeft: 5, fontSize: 11, fontWeight: 600, color: changeColor(assetMonthTotal(m) - assetMonthTotal(m - 1)) }}>
-                            ({fmtSigned(assetMonthTotal(m) - assetMonthTotal(m - 1))})
-                          </span>
-                        )}
-                      </td>,
-                    ])}
+                      );
+                      return cells;
+                    })}
                     <td style={{ textAlign: 'right', fontWeight: 600, background: '#fff8e1', color: net >= 0 ? '#2e7d32' : '#c62828' }}>
                       {fmt(net) || '·'}
                     </td>
@@ -215,19 +275,29 @@ export default function AssetsPage() {
               {/* 합계 행 (자산은 연간합계 대신 1월 대비 증감) */}
               <tr className="summary-row" style={{ borderTop: '2px solid #999' }}>
                 <td style={{ position: 'sticky', left: 0, background: '#f5f5f5', fontWeight: 700, textAlign: 'center' }}>합계</td>
-                {activeTypes.flatMap(t => [
-                  ...t.list.map(it => (
-                    <td key={it.id} style={{ textAlign: 'right', fontWeight: 600 }}>
-                      {t.key === 'ASSET' ? '' : fmt(itemYearTotal(it))}
+                {activeTypes.flatMap(t => {
+                  const isAsset = t.key === 'ASSET';
+                  const cells = [];
+                  t.groups.forEach(g => {
+                    g.items.forEach(it => cells.push(
+                      <td key={it.id} style={{ textAlign: 'right', fontWeight: 600 }}>
+                        {isAsset ? '' : fmt(itemYearTotal(it))}
+                      </td>
+                    ));
+                    if (g.subtotal) cells.push(
+                      <td key={`${t.key}-${g.key}-st`} style={{ textAlign: 'right', fontWeight: 700, color: t.color, background: t.bg }}>
+                        {isAsset ? '' : fmt(groupYearTotal(g))}
+                      </td>
+                    );
+                  });
+                  cells.push(
+                    <td key={`${t.key}-sum`} title={isAsset ? '1월 대비 증감액' : ''}
+                        style={{ textAlign: 'right', fontWeight: 700, color: isAsset ? changeColor(ytdAssetChange) : t.color, background: t.bg, whiteSpace: 'nowrap' }}>
+                      {isAsset ? `${fmtSigned(ytdAssetChange)}` : fmt(MONTHS.reduce((s, m) => s + typeMonthTotal(t.key, m), 0))}
                     </td>
-                  )),
-                  <td key={`${t.key}-sum`} title={t.key === 'ASSET' ? '1월 대비 증감액' : ''}
-                      style={{ textAlign: 'right', fontWeight: 700, color: t.key === 'ASSET' ? changeColor(ytdAssetChange) : t.color, background: t.bg, whiteSpace: 'nowrap' }}>
-                    {t.key === 'ASSET'
-                      ? `${fmtSigned(ytdAssetChange)}`
-                      : fmt(MONTHS.reduce((s, m) => s + typeMonthTotal(t.key, m), 0))}
-                  </td>,
-                ])}
+                  );
+                  return cells;
+                })}
                 <td style={{ textAlign: 'right', fontWeight: 700, background: '#fff3c4' }}>
                   {fmt(MONTHS.reduce((s, m) => s + typeMonthTotal('INCOME', m) - typeMonthTotal('EXPENSE', m), 0))}
                 </td>
