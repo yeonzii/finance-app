@@ -95,6 +95,10 @@ export const saveLoan = (data) =>
 export const deleteLoan = (id) =>
   api.delete(`/loans/${id}`);
 
+// 해당 월 소득/지출 내역에 원리금상환·원금추가상환 반영
+export const reflectLoanExpense = (id) =>
+  api.post(`/loans/${id}/reflect-expense`).then(r => r.data);
+
 // ── 이자율 히스토리 ───────────────────────────────
 export const getLoanRates = () =>
   api.get('/loans/rates').then(r => r.data);

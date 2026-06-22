@@ -47,7 +47,7 @@ function MoneyInput({ value, onChange, placeholder, readOnly, style }) {
   );
 }
 import {
-  getLoans, saveLoan, deleteLoan,
+  getLoans, saveLoan, deleteLoan, reflectLoanExpense,
   getLoanRates, saveLoanRate, deleteLoanRate, calculateInterest
 } from '../api';
 
@@ -131,6 +131,11 @@ export default function LoanPage() {
             await deleteLoan(id);
             loadPlans();
           }}
+          onReflect={async (p) => {
+            if (!confirm(`${p.year}년 ${p.month}월 소득/지출 내역에 원리금상환/원금추가상환을 반영할까요?`)) return;
+            const r = await reflectLoanExpense(p.id);
+            alert(`반영 완료\n원리금상환: ${fmt(r.principalInterest)}원\n원금추가상환: ${fmt(r.extra)}원`);
+          }}
         />
       )}
 
@@ -177,7 +182,7 @@ export default function LoanPage() {
 }
 
 // ── 월별 상환 계획 탭 ──────────────────────────────────────────────
-function PlanTab({ plans, getRateForMonth, latestBalance, totalRepaid, totalInterest, onAdd, onEdit, onDelete }) {
+function PlanTab({ plans, getRateForMonth, latestBalance, totalRepaid, totalInterest, onAdd, onEdit, onDelete, onReflect }) {
   return (
     <>
       <div className="page-header">
@@ -246,7 +251,9 @@ function PlanTab({ plans, getRateForMonth, latestBalance, totalRepaid, totalInte
                   <td className="col-r" style={{ fontWeight: 700, color: '#1a237e' }}>{fmt((p.interestAmount || 0) + (p.repaymentAmount || 0))}</td>
                   <td className="col-r" style={{ color: '#2e7d32' }}>{p.extraPayment ? fmt(p.extraPayment) : '-'}</td>
                   <td className="col-r" style={{ fontWeight: 700, color: '#c62828' }}>{fmt(p.remainingBalance)}</td>
-                  <td>
+                  <td style={{ whiteSpace: 'nowrap' }}>
+                    <button className="btn" style={{ marginRight: 4, background: '#1a237e', color: '#fff' }}
+                            onClick={() => onReflect(p)} title="해당 월 소득/지출 내역에 원리금상환·원금추가상환 반영">지출반영</button>
                     <button className="btn btn-edit" onClick={() => onEdit(p)} style={{ marginRight: 4 }}>수정</button>
                     <button className="btn btn-danger" onClick={() => onDelete(p.id)}>삭제</button>
                   </td>

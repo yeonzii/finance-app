@@ -1,12 +1,16 @@
 package com.finance.app.controller;
 
 import com.finance.app.entity.LoanPlan;
+import com.finance.app.entity.Transaction;
 import com.finance.app.repository.LoanPlanRepository;
+import com.finance.app.repository.TransactionRepository;
 import com.finance.app.service.LoanService;
+import com.finance.app.service.TransactionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/loans")
@@ -16,6 +20,13 @@ public class LoanPlanController {
 
     private final LoanPlanRepository repo;
     private final LoanService loanService;
+    private final TransactionRepository txRepo;
+    private final TransactionService txService;
+
+    // 비용 대분류 / 원리금상환·원금추가상환 코드
+    private static final String EXPENSE = "CD2000";
+    private static final String PRINCIPAL_INTEREST = "CD2231"; // 원리금상환
+    private static final String EXTRA_PRINCIPAL = "CD2232";    // 원금추가상환
 
     @GetMapping
     public List<LoanPlan> getAll() {
@@ -50,5 +61,56 @@ public class LoanPlanController {
     @DeleteMapping("/{id}")
     public void delete(@PathVariable Long id) {
         repo.deleteById(id);
+    }
+
+    /**
+     * 지출반영: 해당 월 소득/지출 내역에 원리금상환·원금추가상환 거래를 생성/갱신.
+     * - 원리금상환액 = 이자금액 + 정기상환액
+     * - 원금추가상환 = 추가상환액 (0이면 기존 거래 제거)
+     */
+    @PostMapping("/{id}/reflect-expense")
+    public Map<String, Object> reflectExpense(@PathVariable Long id) {
+        LoanPlan l = repo.findById(id).orElseThrow();
+        long principalInterest = nz(l.getInterestAmount()) + nz(l.getRepaymentAmount());
+        upsertExpense(l.getYear(), l.getMonth(), PRINCIPAL_INTEREST, principalInterest, "원리금상환");
+
+        long extra = nz(l.getExtraPayment());
+        if (extra > 0) {
+            upsertExpense(l.getYear(), l.getMonth(), EXTRA_PRINCIPAL, extra, "원금추가상환");
+        } else {
+            removeExpense(l.getYear(), l.getMonth(), EXTRA_PRINCIPAL);
+        }
+        return Map.of("ok", true, "principalInterest", principalInterest, "extra", extra);
+    }
+
+    private long nz(Long v) { return v == null ? 0L : v; }
+
+    private String txIdFor(int year, int month, String subCd) {
+        Transaction probe = new Transaction();
+        probe.setYear(year);
+        probe.setMonth(month);
+        probe.setSubcategoryCode(subCd);
+        return txService.generateId(probe); // TR+년+월+코드숫자
+    }
+
+    private void upsertExpense(int year, int month, String subCd, long amount, String note) {
+        String txId = txIdFor(year, month, subCd);
+        Transaction t = txRepo.findById(txId).orElseGet(Transaction::new);
+        t.setId(txId);
+        t.setYear(year);
+        t.setMonth(month);
+        t.setCategoryCode(EXPENSE);
+        t.setSubcategoryCode(subCd);
+        t.setAmount(amount);
+        t.setNote(note);
+        t.setDelYn("N");
+        txRepo.save(t);
+    }
+
+    private void removeExpense(int year, int month, String subCd) {
+        txRepo.findById(txIdFor(year, month, subCd)).ifPresent(t -> {
+            t.setDelYn("Y");
+            txRepo.save(t);
+        });
     }
 }
