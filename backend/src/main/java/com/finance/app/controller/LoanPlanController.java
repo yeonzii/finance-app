@@ -73,12 +73,13 @@ public class LoanPlanController {
     @PostMapping("/{id}/reflect-expense")
     public Map<String, Object> reflectExpense(@PathVariable Long id) {
         LoanPlan l = repo.findById(id).orElseThrow();
+        int payDay = l.getPaymentDay() > 0 ? l.getPaymentDay() : 27; // 결제일 (기본 27)
         long principalInterest = nz(l.getInterestAmount()) + nz(l.getRepaymentAmount());
-        upsertExpense(l.getYear(), l.getMonth(), PRINCIPAL_INTEREST, principalInterest, "원리금상환");
+        upsertExpense(l.getYear(), l.getMonth(), PRINCIPAL_INTEREST, principalInterest, "원리금상환", payDay);
 
         long extra = nz(l.getExtraPayment());
         if (extra > 0) {
-            upsertExpense(l.getYear(), l.getMonth(), EXTRA_PRINCIPAL, extra, "원금추가상환");
+            upsertExpense(l.getYear(), l.getMonth(), EXTRA_PRINCIPAL, extra, "원금추가상환", payDay);
         } else {
             removeExpense(l.getYear(), l.getMonth(), EXTRA_PRINCIPAL);
         }
@@ -95,7 +96,7 @@ public class LoanPlanController {
         return txService.generateId(probe); // TR+년+월+코드숫자
     }
 
-    private void upsertExpense(int year, int month, String subCd, long amount, String note) {
+    private void upsertExpense(int year, int month, String subCd, long amount, String note, int payDay) {
         String txId = txIdFor(year, month, subCd);
         Transaction t = txRepo.findById(txId).orElseGet(Transaction::new);
         t.setId(txId);
@@ -104,6 +105,7 @@ public class LoanPlanController {
         t.setCategoryCode(EXPENSE);
         t.setSubcategoryCode(subCd);
         t.setAmount(amount);
+        t.setTransactionDay(payDay); // 결제일 = 대출 결제일(기본 27)
         t.setNote(note);
         // 코드의 관련기관(REL_ORG_CD)을 기관으로 반영 (예: 새마을금고)
         String orgCd = codeRepo.findById(subCd).map(c -> c.getRelOrgCd()).orElse(null);
