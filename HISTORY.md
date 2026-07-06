@@ -7,7 +7,7 @@
 
 | 항목 | 기술 |
 |------|------|
-| 백엔드 | Spring Boot 3.5 (Java 17), JPA, H2 DB |
+| 백엔드 | Spring Boot 3.5 (Java 25), JPA, H2 DB |
 | 프론트엔드 | React + Vite |
 | DB | H2 파일 DB (개발) → MySQL 전환 가능 |
 | 포트 | 백엔드 8080 / 프론트엔드 5173 |

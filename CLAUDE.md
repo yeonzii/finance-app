@@ -10,7 +10,7 @@
 ## 기술 스택
 | 영역 | 스택 |
 |------|------|
-| 백엔드 | Spring Boot 3.5 (Java 17), JPA/Hibernate |
+| 백엔드 | Spring Boot 3.5 (Java 25), JPA/Hibernate |
 | DB | MySQL (Docker, `financedb`, 계정 `finance`/`finance1234`, 3306) |
 | 프론트 | React + Vite (포트 5173), axios |
 | 백엔드 포트 | 8080 |
