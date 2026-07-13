@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   getTransactions, createTransaction, updateTransaction, deleteTransaction,
   getAllCodes, generateFixedCosts, getPaymentInstitutions
@@ -329,6 +329,8 @@ export default function TransactionsPage() {
 function TransactionModal({ modal, categories, orgTypes, childrenOf, leafDescendants, middleOf, autoOrgFromCode, payMap, onSave, onClose }) {
   const [form, setForm] = useState(modal.data);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  // 오버레이에서 '눌러서 시작'한 클릭만 닫기 (입력창에서 드래그해 선택 시 닫힘 방지)
+  const downOnOverlay = useRef(false);
 
   // 중분류: 대분류의 직속 자식. 수정 시 기존 소분류로부터 역추적
   const [middle, setMiddle] = useState(
@@ -374,8 +376,10 @@ function TransactionModal({ modal, categories, orgTypes, childrenOf, leafDescend
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal modal-wide" onClick={e => e.stopPropagation()}>
+    <div className="modal-overlay"
+         onMouseDown={e => { downOnOverlay.current = e.target === e.currentTarget; }}
+         onClick={e => { if (e.target === e.currentTarget && downOnOverlay.current) onClose(); }}>
+      <div className="modal modal-wide">
         <h3>{modal.mode === 'add' ? '항목 추가' : '항목 수정'}</h3>
 
         {/* 년/월 */}
