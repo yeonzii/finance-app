@@ -289,7 +289,8 @@ function PlanTab({ plans, getRateForMonth, latestBalance, totalRepaid, totalInte
               const isYearStart = idx === 0 || plans[idx - 1].year !== p.year;
               const yearRowSpan = plans.filter(x => x.year === p.year).length;
               return (
-                <tr key={p.id}>
+                <tr key={p.id}
+                    style={isYearStart && idx !== 0 ? { borderTop: '2px solid #9aa0b5' } : undefined}>
                   {isYearStart && (
                     <td className="col-c" rowSpan={yearRowSpan}
                         style={{ fontWeight: 700, verticalAlign: 'middle', background: '#f5f6fa' }}>
