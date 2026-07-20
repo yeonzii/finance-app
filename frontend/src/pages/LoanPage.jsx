@@ -150,6 +150,7 @@ export default function LoanPage() {
           onReflect={async (p) => {
             if (!confirm(`${p.year}년 ${p.month}월 소득/지출 내역에 원리금상환/원금추가상환을 반영할까요?`)) return;
             const r = await reflectLoanExpense(p.id);
+            loadPlans(); // reflectedYn 갱신 → 현재 대출 잔액 즉시 반영
             alert(`반영 완료\n원리금상환: ${fmt(r.principalInterest)}원\n원금추가상환: ${fmt(r.extra)}원`);
           }}
         />
