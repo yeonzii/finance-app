@@ -99,6 +99,10 @@ export const deleteLoan = (id) =>
 export const generateLoanSchedule = (params) =>
   api.post('/loans/schedule/generate', null, { params }).then(r => r.data);
 
+// 기간 일괄 추가상환 설정
+export const bulkExtraPayment = (params) =>
+  api.post('/loans/schedule/bulk-extra', null, { params }).then(r => r.data);
+
 // 해당 월 소득/지출 내역에 원리금상환·원금추가상환 반영
 export const reflectLoanExpense = (id) =>
   api.post(`/loans/${id}/reflect-expense`).then(r => r.data);

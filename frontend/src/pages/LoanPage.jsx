@@ -48,7 +48,7 @@ function MoneyInput({ value, onChange, placeholder, readOnly, style }) {
 }
 import {
   getLoans, saveLoan, deleteLoan, reflectLoanExpense, generateLoanSchedule,
-  getLoanRates, saveLoanRate, deleteLoanRate, calculateInterest
+  bulkExtraPayment, getLoanRates, saveLoanRate, deleteLoanRate, calculateInterest
 } from '../api';
 
 const fmt = (n) => n != null ? Number(n).toLocaleString('ko-KR') : '-';
@@ -73,6 +73,7 @@ export default function LoanPage() {
   const [planModal, setPlanModal] = useState(null);
   const [rateModal, setRateModal] = useState(null);
   const [genModal, setGenModal] = useState(null);
+  const [bulkModal, setBulkModal] = useState(null);
 
   const loadPlans = () => getLoans().then(setPlans);
   const loadRates = () => getLoanRates().then(setRates);
@@ -136,6 +137,16 @@ export default function LoanPage() {
             setGenModal({
               year: new Date().getFullYear(), month: new Date().getMonth() + 1,
               openingBalance: '', annualRate: '4.20', months: 360,
+            });
+          }}
+          onBulkExtra={() => {
+            const first = plans[0], last = plans[plans.length - 1];
+            setBulkModal({
+              fromYear: first?.year ?? new Date().getFullYear(),
+              fromMonth: first?.month ?? 1,
+              toYear: last?.year ?? new Date().getFullYear(),
+              toMonth: last?.month ?? 12,
+              extraPayment: '',
             });
           }}
           onExtraChange={async (p, extra) => {
@@ -207,17 +218,32 @@ export default function LoanPage() {
           onClose={() => setGenModal(null)}
         />
       )}
+
+      {bulkModal && (
+        <BulkExtraModal
+          data={bulkModal}
+          onApply={async (params) => {
+            if (!confirm(`${params.fromYear}년 ${params.fromMonth}월 ~ ${params.toYear}년 ${params.toMonth}월 구간에 매월 추가상환액 ${fmt(params.extraPayment)}원을 일괄 설정합니다. 계속할까요?`)) return;
+            const r = await bulkExtraPayment(params);
+            setBulkModal(null);
+            loadPlans();
+            alert(`${r.count}개월에 일괄 적용됐어요.`);
+          }}
+          onClose={() => setBulkModal(null)}
+        />
+      )}
     </div>
   );
 }
 
 // ── 월별 상환 계획 탭 ──────────────────────────────────────────────
-function PlanTab({ plans, getRateForMonth, latestBalance, totalRepaid, totalInterest, onAdd, onEdit, onDelete, onReflect, onGenerate, onExtraChange }) {
+function PlanTab({ plans, getRateForMonth, latestBalance, totalRepaid, totalInterest, onAdd, onEdit, onDelete, onReflect, onGenerate, onBulkExtra, onExtraChange }) {
   return (
     <>
       <div className="page-header">
         <h2>월별 상환 계획</h2>
         <button className="btn" style={{ background: '#1a237e', color: '#fff', marginRight: 6 }} onClick={onGenerate}>📅 30년 스케줄 생성</button>
+        <button className="btn" style={{ background: '#2e7d32', color: '#fff', marginRight: 6 }} onClick={onBulkExtra} disabled={plans.length === 0}>💰 추가상환 일괄입력</button>
         <button className="btn btn-primary" onClick={onAdd}>+ 월 추가</button>
       </div>
       <div style={{ fontSize: 12, color: '#888', marginBottom: 12 }}>
@@ -380,6 +406,56 @@ function ScheduleGenModal({ data, onGenerate, onClose }) {
           <button className="btn btn-primary" disabled={!valid}
                   onClick={() => onGenerate({ year: form.year, month: form.month, openingBalance: form.openingBalance, annualRate: form.annualRate, months: form.months })}>
             생성
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// 기간 일괄 추가상환 모달
+function BulkExtraModal({ data, onApply, onClose }) {
+  const [form, setForm] = useState(data);
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const from = form.fromYear * 100 + form.fromMonth;
+  const to = form.toYear * 100 + form.toMonth;
+  const rangeOk = from <= to;
+  const valid = rangeOk && form.extraPayment != null && form.extraPayment !== '';
+  return (
+    <div className="modal-overlay" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <h3>추가상환 일괄입력</h3>
+        <div style={{ background: '#e8f5e9', borderRadius: 8, padding: '8px 12px', marginBottom: 14, fontSize: 12, color: '#2e7d32' }}>
+          선택한 <b>시작~종료 년월</b> 구간의 모든 달에 동일한 <b>추가상환액</b>을 설정해요. 이후 달의 잔액이 자동 재계산됩니다.
+        </div>
+        <div className="form-grid">
+          <div className="form-group">
+            <label>시작 년</label>
+            <input type="number" value={form.fromYear} onChange={e => set('fromYear', +e.target.value)} />
+          </div>
+          <div className="form-group">
+            <label>시작 월</label>
+            <input type="number" min={1} max={12} value={form.fromMonth} onChange={e => set('fromMonth', +e.target.value)} />
+          </div>
+          <div className="form-group">
+            <label>종료 년</label>
+            <input type="number" value={form.toYear} onChange={e => set('toYear', +e.target.value)} />
+          </div>
+          <div className="form-group">
+            <label>종료 월</label>
+            <input type="number" min={1} max={12} value={form.toMonth} onChange={e => set('toMonth', +e.target.value)} />
+          </div>
+          <div className="form-group full">
+            <label>월 추가상환액 (원)</label>
+            <MoneyInput value={form.extraPayment} onChange={v => set('extraPayment', v)} placeholder="예: 1000000 (0 입력 시 해당 구간 추가상환 해제)" />
+          </div>
+        </div>
+        {!rangeOk && <div style={{ color: '#c62828', fontSize: 12, marginBottom: 8 }}>종료 년월이 시작 년월보다 빠릅니다.</div>}
+        <div className="modal-actions">
+          <button className="btn btn-cancel" onClick={onClose}>취소</button>
+          <button className="btn" style={{ background: '#2e7d32', color: '#fff' }} disabled={!valid}
+                  onClick={() => onApply({ fromYear: form.fromYear, fromMonth: form.fromMonth, toYear: form.toYear, toMonth: form.toMonth, extraPayment: form.extraPayment })}>
+            일괄 적용
           </button>
         </div>
       </div>

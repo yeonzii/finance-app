@@ -131,6 +131,29 @@ public class LoanScheduleService {
         }
     }
 
+    // ── 기간 일괄 추가상환 ────────────────────────────────────────────
+    /**
+     * (fromYear,fromMonth) ~ (toYear,toMonth) 구간의 모든 행에 동일한 추가상환액을 설정한 뒤,
+     * 시작 월부터 이후 전체 잔액 체인을 재계산한다.
+     * @return 적용된 행 수
+     */
+    public int bulkExtra(int fromYear, int fromMonth, int toYear, int toMonth, long extraPayment) {
+        int from = fromYear * 100 + fromMonth;
+        int to = toYear * 100 + toMonth;
+        List<LoanPlan> rows = repo.findAllByOrderByYearAscMonthAsc();
+        int count = 0;
+        for (LoanPlan p : rows) {
+            int ym = p.getYear() * 100 + p.getMonth();
+            if (ym >= from && ym <= to) {
+                p.setExtraPayment(extraPayment);
+                repo.save(p);
+                count++;
+            }
+        }
+        if (count > 0) recalcFrom(fromYear, fromMonth);
+        return count;
+    }
+
     // ── 헬퍼 ──────────────────────────────────────────────────────────
     private LoanPlan buildRow(int y, int m, long opening, BigDecimal rate, int n, long extra) {
         MonthResult res = calcMonth(opening, rate, n, extra);

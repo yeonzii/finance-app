@@ -77,6 +77,17 @@ public class LoanPlanController {
         return scheduleService.generate(year, month, openingBalance, annualRate, months);
     }
 
+    /**
+     * 기간 일괄 추가상환: 시작~종료 년월 구간의 모든 월에 동일한 추가상환액을 설정 후 재계산.
+     */
+    @PostMapping("/schedule/bulk-extra")
+    public Map<String, Object> bulkExtra(@RequestParam int fromYear, @RequestParam int fromMonth,
+                                         @RequestParam int toYear, @RequestParam int toMonth,
+                                         @RequestParam long extraPayment) {
+        int count = scheduleService.bulkExtra(fromYear, fromMonth, toYear, toMonth, extraPayment);
+        return Map.of("ok", true, "count", count);
+    }
+
     @DeleteMapping("/{id}")
     public void delete(@PathVariable Long id) {
         repo.deleteById(id);
