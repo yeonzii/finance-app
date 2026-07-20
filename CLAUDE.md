@@ -10,7 +10,7 @@
 ## 기술 스택
 | 영역 | 스택 |
 |------|------|
-| 백엔드 | Spring Boot 3.5 (Java 25), JPA/Hibernate |
+| 백엔드 | Spring Boot 3.5 (Java 17), JPA/Hibernate |
 | DB | MySQL (Docker, `financedb`, 계정 `finance`/`finance1234`, 3306) |
 | 프론트 | React + Vite (포트 5173), axios |
 | 백엔드 포트 | 8080 |
@@ -52,6 +52,24 @@ cd ~/finance-app/frontend && npm run dev
 - **비용 카드 중복비용**: 고정비 중 관련기관이 카드사면 카드값과 중복 → 비용 소계에 (-)중복/(=)중복제거 표시.
 - **대출 지출반영 버튼**: 원리금상환(이자+정기, 결제일/청구일=27) + 원금추가상환(일자 미세팅)을 해당 월 거래로 생성/갱신. 기관=코드의 REL_ORG_CD.
 - **이자 계산**: 월할 `잔액 × 연이자율% ÷ 12`.
+
+## 대출 상환 스케줄 (원리금균등 · 기간유지형)
+주택담보대출 30년(360개월) 스케줄. `LoanScheduleService.calcMonth`가 순수 함수 계산 엔진(테스트 직접 호출).
+- **월별 계산** (월초잔액 P, 연이자율%, 잔여개월 n, 추가상환 extra):
+  1. 월이자율 `r = 연이자율% / 100 / 12`
+  2. `이자 = FLOOR(P × r)` (원단위 절사)
+  3. `총상환액 M = PMT(r,n,P)`를 **백의자리 버림**(`setScale(-2, FLOOR)`, 100원 미만 절사)
+     → 은행 고지값과 정확히 일치 (ROUND 아님).
+  4. `정기상환액(원금분) = M − 이자`
+  5. `월말잔액 = P − 정기 − extra`
+  6. 다음달: 월초 = 이번달 월말, `n = n − 1` (**추가상환과 무관하게 매달 −1** = 기간유지형)
+- **검증값**(연 4.2%): 5월 이자 2,905,000·정기 1,153,800 / 6월 2,897,461·1,156,439 / 7월 2,823,414·1,132,386.
+- **추가상환 입력**: 잔액(P)만 줄이고 잔여개월(n)·이자·정기는 불변. 입력 시 `recalcFrom`으로 이후 전 행 잔액 체인 자동 재계산.
+- **30년 스케줄 생성**: `POST /api/loans/schedule/generate` — 기존 추가상환액·`reflectedYn` 보존 후 전체 재생성.
+- **현재 대출 잔액**: `reflectedYn='Y'`(지출반영 누른) 마지막 달의 월말잔액. 없으면 최초 월초잔액.
+  (360개월 완납 마지막 행의 0원이 잡히지 않게 하려는 것.)
+- 엔티티 `LoanPlan`: loanAmount(월초)·interestAmount·repaymentAmount(정기)·extraPayment·remainingBalance(월말)·remainingMonths(n)·reflectedYn·appliedRate·paymentDay(27).
+- 테스트: `LoanScheduleServiceTest` (계산값 정확 검증 + 총상환액 100원 단위, 6 pass).
 
 ## 작업 규칙
 - 변경은 **기능 단위로 커밋·푸시**(한글 커밋 메시지, `Co-Authored-By: Claude ...` 유지).
