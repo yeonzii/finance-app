@@ -31,6 +31,10 @@ public class LoanPlan {
     // 잔여 상환개월수 (기간유지형: 추가상환과 무관하게 매달 −1)
     private Integer remainingMonths;
 
+    // 지출반영 여부 (Y=이 달 상환을 소득/지출에 반영함 → 현재잔액 기준)
+    @Column(length = 1)
+    private String reflectedYn = "N";
+
     // 이 달에 적용된 연이자율 (%) — 나중에 이자율이 바뀌어도 해당 월 기록 보존
     @Column(precision = 5, scale = 2)
     private BigDecimal appliedRate;

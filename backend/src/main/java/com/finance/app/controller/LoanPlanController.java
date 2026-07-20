@@ -102,7 +102,11 @@ public class LoanPlanController {
         } else {
             removeExpense(l.getYear(), l.getMonth(), EXTRA_PRINCIPAL);
         }
-        return Map.of("ok", true, "principalInterest", principalInterest, "extra", extra);
+        // 이 달을 '상환 반영됨'으로 표시 → 현재 대출잔액 기준
+        l.setReflectedYn("Y");
+        repo.save(l);
+        return Map.of("ok", true, "principalInterest", principalInterest, "extra", extra,
+                "remainingBalance", nz(l.getRemainingBalance()));
     }
 
     private long nz(Long v) { return v == null ? 0L : v; }

@@ -53,7 +53,8 @@ public class LoanScheduleService {
             BigDecimal q = BigDecimal.ONE.add(r).pow(n, MC);           // (1+r)^n
             BigDecimal pmt = P.multiply(r, MC).multiply(q, MC)
                     .divide(q.subtract(BigDecimal.ONE), MC);            // P·r·q/(q−1)
-            totalPayment = pmt.setScale(0, RoundingMode.HALF_UP).longValue(); // ROUND
+            // 백의 자리에서 버림 (100원 미만 절사) — 은행 고지 방식
+            totalPayment = pmt.setScale(-2, RoundingMode.FLOOR).longValue();
         }
 
         long principal = totalPayment - interest;
@@ -68,10 +69,13 @@ public class LoanScheduleService {
      */
     public List<LoanPlan> generate(int startYear, int startMonth, long openingBalance,
                                    BigDecimal defaultRate, int months) {
-        // 기존 추가상환액 보존 (ym → extra)
+        // 기존 추가상환액·지출반영 여부 보존 (ym → …)
         Map<Integer, Long> extras = new HashMap<>();
+        Map<Integer, String> reflected = new HashMap<>();
         for (LoanPlan p : repo.findAll()) {
-            extras.put(p.getYear() * 100 + p.getMonth(), nz(p.getExtraPayment()));
+            int ym = p.getYear() * 100 + p.getMonth();
+            extras.put(ym, nz(p.getExtraPayment()));
+            reflected.put(ym, p.getReflectedYn());
         }
         repo.deleteAll();
 
@@ -83,6 +87,7 @@ public class LoanScheduleService {
             long extra = extras.getOrDefault(y * 100 + m, 0L);
 
             LoanPlan p = buildRow(y, m, opening, rate, n, extra);
+            p.setReflectedYn(reflected.getOrDefault(y * 100 + m, "N"));
             repo.save(p);
 
             opening = nz(p.getRemainingBalance());

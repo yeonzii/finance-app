@@ -80,7 +80,11 @@ export default function LoanPage() {
   useEffect(() => { loadPlans(); loadRates(); }, []);
 
   // 상환계획 요약
-  const latestBalance = plans.length > 0 ? plans[plans.length - 1].remainingBalance : null;
+  // 현재 대출 잔액 = 지출반영(상환 완료)한 마지막 달의 월말잔액. 없으면 최초 월초잔액.
+  const reflectedPlans = plans.filter(p => p.reflectedYn === 'Y');
+  const latestBalance = reflectedPlans.length > 0
+    ? reflectedPlans[reflectedPlans.length - 1].remainingBalance
+    : (plans.length > 0 ? plans[0].loanAmount : null);
   const totalRepaid   = plans.reduce((s, r) => s + (r.repaymentAmount || 0) + (r.extraPayment || 0), 0);
   const totalInterest = plans.reduce((s, r) => s + (r.interestAmount || 0), 0);
 
