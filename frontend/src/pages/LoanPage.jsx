@@ -127,10 +127,6 @@ export default function LoanPage() {
           latestBalance={latestBalance}
           totalRepaid={totalRepaid}
           totalInterest={totalInterest}
-          onAdd={() => {
-          const lastPlan = plans[plans.length - 1];
-          setPlanModal({ mode: 'add', data: { ...EMPTY_PLAN, loanAmount: lastPlan?.remainingBalance || '' } });
-        }}
           onEdit={(r) => setPlanModal({ mode: 'edit', data: { ...r } })}
           onGenerate={() => {
             const last = plans[plans.length - 1];
@@ -237,14 +233,13 @@ export default function LoanPage() {
 }
 
 // ── 월별 상환 계획 탭 ──────────────────────────────────────────────
-function PlanTab({ plans, getRateForMonth, latestBalance, totalRepaid, totalInterest, onAdd, onEdit, onDelete, onReflect, onGenerate, onBulkExtra, onExtraChange }) {
+function PlanTab({ plans, getRateForMonth, latestBalance, totalRepaid, totalInterest, onEdit, onDelete, onReflect, onGenerate, onBulkExtra, onExtraChange }) {
   return (
     <>
       <div className="page-header">
         <h2>월별 상환 계획</h2>
         <button className="btn" style={{ background: '#1a237e', color: '#fff', marginRight: 6 }} onClick={onGenerate}>📅 30년 스케줄 생성</button>
         <button className="btn" style={{ background: '#2e7d32', color: '#fff', marginRight: 6 }} onClick={onBulkExtra} disabled={plans.length === 0}>💰 추가상환 일괄입력</button>
-        <button className="btn btn-primary" onClick={onAdd}>+ 월 추가</button>
       </div>
       <div style={{ fontSize: 12, color: '#888', marginBottom: 12 }}>
         💡 원리금균등상환(기간유지형). <b>추가 상환액</b>만 입력하면 이후 달의 이자·정기·잔액이 자동 재계산돼요.
@@ -269,7 +264,8 @@ function PlanTab({ plans, getRateForMonth, latestBalance, totalRepaid, totalInte
         <table>
           <thead>
             <tr>
-              <th>년월</th>
+              <th>년도</th>
+              <th>월</th>
               <th>잔여개월</th>
               <th>월초 잔액</th>
               <th style={{ color: '#1a237e' }}>적용 이자율</th>
@@ -283,15 +279,24 @@ function PlanTab({ plans, getRateForMonth, latestBalance, totalRepaid, totalInte
           </thead>
           <tbody>
             {plans.length === 0 && (
-              <tr><td colSpan={10} className="empty-state">상환 스케줄이 없어요. <b>30년 스케줄 생성</b>으로 만들어보세요.</td></tr>
+              <tr><td colSpan={11} className="empty-state">상환 스케줄이 없어요. <b>30년 스케줄 생성</b>으로 만들어보세요.</td></tr>
             )}
-            {plans.map(p => {
+            {plans.map((p, idx) => {
               const rateInfo = getRateForMonth(p.year, p.month);
               const hasRateMismatch = rateInfo && p.appliedRate &&
                 Number(rateInfo.annualRate).toFixed(2) !== Number(p.appliedRate).toFixed(2);
+              // 같은 년도끼리 묶어 년도 셀은 그룹의 첫 행에만 rowSpan으로 표시
+              const isYearStart = idx === 0 || plans[idx - 1].year !== p.year;
+              const yearRowSpan = plans.filter(x => x.year === p.year).length;
               return (
                 <tr key={p.id}>
-                  <td className="col-c" style={{ fontWeight: 600 }}>{p.year}년 {p.month}월</td>
+                  {isYearStart && (
+                    <td className="col-c" rowSpan={yearRowSpan}
+                        style={{ fontWeight: 700, verticalAlign: 'middle', background: '#f5f6fa' }}>
+                      {p.year}년
+                    </td>
+                  )}
+                  <td className="col-c" style={{ fontWeight: 600 }}>{p.month}월</td>
                   <td className="col-c" style={{ color: '#888' }}>{p.remainingMonths ?? '-'}</td>
                   <td className="col-r">{fmt(p.loanAmount)}</td>
                   <td className="col-c" style={{ fontWeight: 600, color: '#1a237e' }}>
@@ -326,7 +331,7 @@ function PlanTab({ plans, getRateForMonth, latestBalance, totalRepaid, totalInte
             })}
             {plans.length > 0 && (
               <tr className="summary-row">
-                <td className="col-c">합계</td>
+                <td className="col-c" colSpan={2}>합계</td>
                 <td className="col-c">-</td>
                 <td className="col-c">-</td>
                 <td className="col-c">-</td>
