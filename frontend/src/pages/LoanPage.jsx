@@ -344,8 +344,7 @@ function PlanTab({ plans, getRateForMonth, latestBalance, totalRepaid, totalInte
                 <td className="col-r">{fmt(plans.reduce((s, r) => s + (r.repaymentAmount || 0), 0))}</td>
                 <td className="col-r" style={{ fontWeight: 700, color: '#1a237e' }}>{fmt(plans.reduce((s, r) => s + (r.interestAmount || 0) + (r.repaymentAmount || 0), 0))}</td>
                 <td className="col-r">{fmt(plans.reduce((s, r) => s + (r.extraPayment || 0), 0))}</td>
-                <td className="col-c">-</td>
-                <td className="col-c">
+                <td style={{ textAlign: 'left' }}>
                   {hiddenCount > 0 && (
                     <span title="추가상환으로 단축된 대출 잔여기간"
                           style={{ display: 'inline-block', padding: '4px 10px', borderRadius: 12,
@@ -354,6 +353,7 @@ function PlanTab({ plans, getRateForMonth, latestBalance, totalRepaid, totalInte
                     </span>
                   )}
                 </td>
+                <td></td>
               </tr>
             )}
           </tbody>
