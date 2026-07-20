@@ -5,11 +5,13 @@ import com.finance.app.entity.Transaction;
 import com.finance.app.repository.CommonCodeRepository;
 import com.finance.app.repository.LoanPlanRepository;
 import com.finance.app.repository.TransactionRepository;
+import com.finance.app.service.LoanScheduleService;
 import com.finance.app.service.LoanService;
 import com.finance.app.service.TransactionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
@@ -21,6 +23,7 @@ public class LoanPlanController {
 
     private final LoanPlanRepository repo;
     private final LoanService loanService;
+    private final LoanScheduleService scheduleService;
     private final TransactionRepository txRepo;
     private final TransactionService txService;
     private final CommonCodeRepository codeRepo;
@@ -57,7 +60,21 @@ public class LoanPlanController {
     public LoanPlan update(@PathVariable Long id, @RequestBody LoanPlan l) {
         l.setId(id);
         if (l.getPaymentDay() == 0) l.setPaymentDay(27);
-        return repo.save(l);
+        LoanPlan saved = repo.save(l);
+        // 추가상환 등 변경 → 이 달부터 이후 스케줄 자동 재계산
+        scheduleService.recalcFrom(saved.getYear(), saved.getMonth());
+        return repo.findById(id).orElse(saved);
+    }
+
+    /**
+     * 30년(months) 상환 스케줄 전체 생성 (기존 데이터 대체, 추가상환액은 보존).
+     */
+    @PostMapping("/schedule/generate")
+    public List<LoanPlan> generateSchedule(@RequestParam int year, @RequestParam int month,
+                                           @RequestParam long openingBalance,
+                                           @RequestParam BigDecimal annualRate,
+                                           @RequestParam(defaultValue = "360") int months) {
+        return scheduleService.generate(year, month, openingBalance, annualRate, months);
     }
 
     @DeleteMapping("/{id}")

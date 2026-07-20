@@ -95,6 +95,10 @@ export const saveLoan = (data) =>
 export const deleteLoan = (id) =>
   api.delete(`/loans/${id}`);
 
+// 30년 상환 스케줄 전체 생성 (원리금균등·기간유지형)
+export const generateLoanSchedule = (params) =>
+  api.post('/loans/schedule/generate', null, { params }).then(r => r.data);
+
 // 해당 월 소득/지출 내역에 원리금상환·원금추가상환 반영
 export const reflectLoanExpense = (id) =>
   api.post(`/loans/${id}/reflect-expense`).then(r => r.data);

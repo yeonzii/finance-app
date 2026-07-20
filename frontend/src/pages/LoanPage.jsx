@@ -47,7 +47,7 @@ function MoneyInput({ value, onChange, placeholder, readOnly, style }) {
   );
 }
 import {
-  getLoans, saveLoan, deleteLoan, reflectLoanExpense,
+  getLoans, saveLoan, deleteLoan, reflectLoanExpense, generateLoanSchedule,
   getLoanRates, saveLoanRate, deleteLoanRate, calculateInterest
 } from '../api';
 
@@ -72,6 +72,7 @@ export default function LoanPage() {
   const [rates, setRates] = useState([]);
   const [planModal, setPlanModal] = useState(null);
   const [rateModal, setRateModal] = useState(null);
+  const [genModal, setGenModal] = useState(null);
 
   const loadPlans = () => getLoans().then(setPlans);
   const loadRates = () => getLoanRates().then(setRates);
@@ -126,6 +127,17 @@ export default function LoanPage() {
           setPlanModal({ mode: 'add', data: { ...EMPTY_PLAN, loanAmount: lastPlan?.remainingBalance || '' } });
         }}
           onEdit={(r) => setPlanModal({ mode: 'edit', data: { ...r } })}
+          onGenerate={() => {
+            const last = plans[plans.length - 1];
+            setGenModal({
+              year: new Date().getFullYear(), month: new Date().getMonth() + 1,
+              openingBalance: '', annualRate: '4.20', months: 360,
+            });
+          }}
+          onExtraChange={async (p, extra) => {
+            await saveLoan({ ...p, extraPayment: extra });
+            loadPlans(); // 백엔드가 이후 월 자동 재계산 → 재로딩
+          }}
           onDelete={async (id) => {
             if (!confirm('삭제할까요?')) return;
             await deleteLoan(id);
@@ -177,17 +189,34 @@ export default function LoanPage() {
           onClose={() => setRateModal(null)}
         />
       )}
+
+      {genModal && (
+        <ScheduleGenModal
+          data={genModal}
+          onGenerate={async (params) => {
+            if (!confirm('기존 상환 스케줄을 새로 생성합니다. (추가상환액은 유지) 계속할까요?')) return;
+            await generateLoanSchedule(params);
+            setGenModal(null);
+            loadPlans();
+          }}
+          onClose={() => setGenModal(null)}
+        />
+      )}
     </div>
   );
 }
 
 // ── 월별 상환 계획 탭 ──────────────────────────────────────────────
-function PlanTab({ plans, getRateForMonth, latestBalance, totalRepaid, totalInterest, onAdd, onEdit, onDelete, onReflect }) {
+function PlanTab({ plans, getRateForMonth, latestBalance, totalRepaid, totalInterest, onAdd, onEdit, onDelete, onReflect, onGenerate, onExtraChange }) {
   return (
     <>
       <div className="page-header">
         <h2>월별 상환 계획</h2>
+        <button className="btn" style={{ background: '#1a237e', color: '#fff', marginRight: 6 }} onClick={onGenerate}>📅 30년 스케줄 생성</button>
         <button className="btn btn-primary" onClick={onAdd}>+ 월 추가</button>
+      </div>
+      <div style={{ fontSize: 12, color: '#888', marginBottom: 12 }}>
+        💡 원리금균등상환(기간유지형). <b>추가 상환액</b>만 입력하면 이후 달의 이자·정기·잔액이 자동 재계산돼요.
       </div>
 
       <div className="asset-cards" style={{ marginBottom: 16 }}>
@@ -210,19 +239,20 @@ function PlanTab({ plans, getRateForMonth, latestBalance, totalRepaid, totalInte
           <thead>
             <tr>
               <th>년월</th>
-              <th>대출 잔액</th>
+              <th>잔여개월</th>
+              <th>월초 잔액</th>
               <th style={{ color: '#1a237e' }}>적용 이자율</th>
               <th style={{ color: '#e65100' }}>이자금액 (27일)</th>
               <th>정기 상환액</th>
               <th style={{ color: '#1a237e' }}>총 원리금상환액</th>
               <th>추가 상환액</th>
-              <th>상환 후 잔액</th>
+              <th>월말 잔액</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
             {plans.length === 0 && (
-              <tr><td colSpan={9} className="empty-state">상환 내역이 없어요. 먼저 이자율을 등록하고 월을 추가해보세요.</td></tr>
+              <tr><td colSpan={10} className="empty-state">상환 스케줄이 없어요. <b>30년 스케줄 생성</b>으로 만들어보세요.</td></tr>
             )}
             {plans.map(p => {
               const rateInfo = getRateForMonth(p.year, p.month);
@@ -231,6 +261,7 @@ function PlanTab({ plans, getRateForMonth, latestBalance, totalRepaid, totalInte
               return (
                 <tr key={p.id}>
                   <td className="col-c" style={{ fontWeight: 600 }}>{p.year}년 {p.month}월</td>
+                  <td className="col-c" style={{ color: '#888' }}>{p.remainingMonths ?? '-'}</td>
                   <td className="col-r">{fmt(p.loanAmount)}</td>
                   <td className="col-c" style={{ fontWeight: 600, color: '#1a237e' }}>
                     {fmtRate(p.appliedRate)}
@@ -249,7 +280,9 @@ function PlanTab({ plans, getRateForMonth, latestBalance, totalRepaid, totalInte
                   </td>
                   <td className="col-r">{fmt(p.repaymentAmount)}</td>
                   <td className="col-r" style={{ fontWeight: 700, color: '#1a237e' }}>{fmt((p.interestAmount || 0) + (p.repaymentAmount || 0))}</td>
-                  <td className="col-r" style={{ color: '#2e7d32' }}>{p.extraPayment ? fmt(p.extraPayment) : '-'}</td>
+                  <td style={{ padding: 2 }}>
+                    <ExtraInput value={p.extraPayment} onCommit={(v) => onExtraChange(p, v)} />
+                  </td>
                   <td className="col-r" style={{ fontWeight: 700, color: '#c62828' }}>{fmt(p.remainingBalance)}</td>
                   <td style={{ whiteSpace: 'nowrap' }}>
                     <button className="btn btn-edit" onClick={() => onEdit(p)} style={{ marginRight: 4 }}>수정</button>
@@ -265,6 +298,7 @@ function PlanTab({ plans, getRateForMonth, latestBalance, totalRepaid, totalInte
                 <td className="col-c">합계</td>
                 <td className="col-c">-</td>
                 <td className="col-c">-</td>
+                <td className="col-c">-</td>
                 <td className="col-r" style={{ color: '#e65100' }}>{fmt(totalInterest)}</td>
                 <td className="col-r">{fmt(plans.reduce((s, r) => s + (r.repaymentAmount || 0), 0))}</td>
                 <td className="col-r" style={{ fontWeight: 700, color: '#1a237e' }}>{fmt(plans.reduce((s, r) => s + (r.interestAmount || 0) + (r.repaymentAmount || 0), 0))}</td>
@@ -277,6 +311,74 @@ function PlanTab({ plans, getRateForMonth, latestBalance, totalRepaid, totalInte
         </table>
       </div>
     </>
+  );
+}
+
+// 추가 상환액 인라인 입력 (콤마, blur/Enter 시 저장→자동재계산)
+function ExtraInput({ value, onCommit }) {
+  const [display, setDisplay] = useState(value ? Number(value).toLocaleString('ko-KR') : '');
+  useEffect(() => { setDisplay(value ? Number(value).toLocaleString('ko-KR') : ''); }, [value]);
+  return (
+    <input
+      type="text" inputMode="numeric" value={display} placeholder="0"
+      onChange={e => { const raw = e.target.value.replace(/[^0-9]/g, ''); setDisplay(raw ? Number(raw).toLocaleString('ko-KR') : ''); }}
+      onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); }}
+      onFocus={e => { e.target.style.border = '1px solid #2e7d32'; e.target.style.background = '#fff'; e.target.select(); }}
+      onBlur={e => {
+        e.target.style.border = '1px solid transparent'; e.target.style.background = 'transparent';
+        const raw = display.replace(/[^0-9]/g, '');
+        const num = raw === '' ? 0 : +raw;
+        if (num !== (value || 0)) onCommit(num);
+      }}
+      style={{ width: '100%', border: '1px solid transparent', background: 'transparent',
+               textAlign: 'right', padding: '4px 6px', borderRadius: 4, font: 'inherit', color: '#2e7d32', fontWeight: 600 }}
+    />
+  );
+}
+
+// 30년 스케줄 생성 모달
+function ScheduleGenModal({ data, onGenerate, onClose }) {
+  const [form, setForm] = useState(data);
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const valid = form.openingBalance && form.annualRate && form.months;
+  return (
+    <div className="modal-overlay" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <h3>30년 상환 스케줄 생성</h3>
+        <div style={{ background: '#e8eaf6', borderRadius: 8, padding: '8px 12px', marginBottom: 14, fontSize: 12, color: '#3949ab' }}>
+          원리금균등상환(기간유지형)으로 시작 시점부터 개월수만큼 전체 생성해요. 기존 <b>추가상환액</b>은 유지됩니다.
+        </div>
+        <div className="form-grid">
+          <div className="form-group">
+            <label>시작 년</label>
+            <input type="number" value={form.year} onChange={e => set('year', +e.target.value)} />
+          </div>
+          <div className="form-group">
+            <label>시작 월</label>
+            <input type="number" min={1} max={12} value={form.month} onChange={e => set('month', +e.target.value)} />
+          </div>
+          <div className="form-group full">
+            <label>시작 월초 잔액 (원)</label>
+            <MoneyInput value={form.openingBalance} onChange={v => set('openingBalance', v)} placeholder="예: 830000000" />
+          </div>
+          <div className="form-group">
+            <label>연이자율 (%)</label>
+            <input type="number" step="0.01" value={form.annualRate} onChange={e => set('annualRate', e.target.value)} placeholder="4.20" />
+          </div>
+          <div className="form-group">
+            <label>개월수</label>
+            <input type="number" value={form.months} onChange={e => set('months', +e.target.value)} />
+          </div>
+        </div>
+        <div className="modal-actions">
+          <button className="btn btn-cancel" onClick={onClose}>취소</button>
+          <button className="btn btn-primary" disabled={!valid}
+                  onClick={() => onGenerate({ year: form.year, month: form.month, openingBalance: form.openingBalance, annualRate: form.annualRate, months: form.months })}>
+            생성
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
