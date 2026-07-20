@@ -136,11 +136,12 @@ export default function LoanPage() {
             });
           }}
           onBulkExtra={() => {
-            const first = plans[0], last = plans[plans.length - 1];
+            const now = new Date();
+            const last = plans[plans.length - 1];
             setBulkModal({
-              fromYear: first?.year ?? new Date().getFullYear(),
-              fromMonth: first?.month ?? 1,
-              toYear: last?.year ?? new Date().getFullYear(),
+              fromYear: now.getFullYear(),
+              fromMonth: now.getMonth() + 1,
+              toYear: last?.year ?? now.getFullYear(),
               toMonth: last?.month ?? 12,
               extraPayment: '',
             });
