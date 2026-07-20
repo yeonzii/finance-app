@@ -235,6 +235,9 @@ export default function LoanPage() {
 
 // ── 월별 상환 계획 탭 ──────────────────────────────────────────────
 function PlanTab({ plans, getRateForMonth, latestBalance, totalRepaid, totalInterest, onEdit, onDelete, onReflect, onGenerate, onBulkExtra, onExtraChange }) {
+  // 완납 이후 완전 비활성(월초 잔액 0) 행은 숨김 → 단축된 개월수 카운트
+  const rows = plans.filter(p => (p.loanAmount || 0) > 0);
+  const hiddenCount = plans.length - rows.length;
   return (
     <>
       <div className="page-header">
@@ -279,16 +282,16 @@ function PlanTab({ plans, getRateForMonth, latestBalance, totalRepaid, totalInte
             </tr>
           </thead>
           <tbody>
-            {plans.length === 0 && (
+            {rows.length === 0 && (
               <tr><td colSpan={11} className="empty-state">상환 스케줄이 없어요. <b>30년 스케줄 생성</b>으로 만들어보세요.</td></tr>
             )}
-            {plans.map((p, idx) => {
+            {rows.map((p, idx) => {
               const rateInfo = getRateForMonth(p.year, p.month);
               const hasRateMismatch = rateInfo && p.appliedRate &&
                 Number(rateInfo.annualRate).toFixed(2) !== Number(p.appliedRate).toFixed(2);
               // 같은 년도끼리 묶어 년도 셀은 그룹의 첫 행에만 rowSpan으로 표시
-              const isYearStart = idx === 0 || plans[idx - 1].year !== p.year;
-              const yearRowSpan = plans.filter(x => x.year === p.year).length;
+              const isYearStart = idx === 0 || rows[idx - 1].year !== p.year;
+              const yearRowSpan = rows.filter(x => x.year === p.year).length;
               return (
                 <tr key={p.id}
                     style={isYearStart && idx !== 0 ? { borderTop: '2px solid #9aa0b5' } : undefined}>
@@ -331,7 +334,7 @@ function PlanTab({ plans, getRateForMonth, latestBalance, totalRepaid, totalInte
                 </tr>
               );
             })}
-            {plans.length > 0 && (
+            {rows.length > 0 && (
               <tr className="summary-row">
                 <td className="col-c" colSpan={2}>합계</td>
                 <td className="col-c">-</td>
@@ -342,7 +345,15 @@ function PlanTab({ plans, getRateForMonth, latestBalance, totalRepaid, totalInte
                 <td className="col-r" style={{ fontWeight: 700, color: '#1a237e' }}>{fmt(plans.reduce((s, r) => s + (r.interestAmount || 0) + (r.repaymentAmount || 0), 0))}</td>
                 <td className="col-r">{fmt(plans.reduce((s, r) => s + (r.extraPayment || 0), 0))}</td>
                 <td className="col-c">-</td>
-                <td></td>
+                <td className="col-c">
+                  {hiddenCount > 0 && (
+                    <span title="추가상환으로 단축된 대출 잔여기간"
+                          style={{ display: 'inline-block', padding: '4px 10px', borderRadius: 12,
+                                   background: '#e8f5e9', color: '#2e7d32', fontWeight: 700, fontSize: 12, whiteSpace: 'nowrap' }}>
+                      ⏱ 단축 {hiddenCount}개월
+                    </span>
+                  )}
+                </td>
               </tr>
             )}
           </tbody>
