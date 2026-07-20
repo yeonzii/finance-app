@@ -58,7 +58,14 @@ public class LoanScheduleService {
         }
 
         long principal = totalPayment - interest;
+        // 조기 완납 처리: 정기상환액이 잔액을 초과할 수 없음 (마이너스 대출 방지)
+        if (principal > openingBalance) {
+            principal = openingBalance;
+            totalPayment = interest + principal;
+        }
+        // 월말잔액은 0 밑으로 내려가지 않음 (추가상환이 잔여 잔액을 초과해도 0)
         long closing = openingBalance - principal - extraPayment;
+        if (closing < 0) closing = 0;
         return new MonthResult(interest, totalPayment, principal, closing);
     }
 
@@ -117,13 +124,29 @@ public class LoanScheduleService {
 
         for (int i = startIdx; i < rows.size(); i++) {
             LoanPlan p = rows.get(i);
+
+            // 이미 완납된 이후의 달: 전부 0으로 (추가상환도 미적용 → 유령 상환액 방지)
+            if (opening <= 0) {
+                p.setLoanAmount(0L);
+                p.setInterestAmount(0L);
+                p.setRepaymentAmount(0L);
+                p.setExtraPayment(0L);
+                p.setRemainingBalance(0L);
+                repo.save(p);
+                continue;
+            }
+
             int n = p.getRemainingMonths() != null ? p.getRemainingMonths() : 1;
             BigDecimal rate = p.getAppliedRate() != null ? p.getAppliedRate() : BigDecimal.ZERO;
-            MonthResult res = calcMonth(opening, rate, n, nz(p.getExtraPayment()));
+            long extra = nz(p.getExtraPayment());
+            MonthResult res = calcMonth(opening, rate, n, extra);
+            // 이번 달에 실제 적용되는 추가상환액 (정기상환 후 잔여 잔액 초과분은 절사)
+            long appliedExtra = Math.min(extra, Math.max(0, opening - res.principal()));
 
             p.setLoanAmount(opening);
             p.setInterestAmount(res.interest());
             p.setRepaymentAmount(res.principal());
+            p.setExtraPayment(appliedExtra);
             p.setRemainingBalance(res.closing());
             repo.save(p);
 

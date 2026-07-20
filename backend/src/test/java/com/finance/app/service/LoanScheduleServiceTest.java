@@ -60,6 +60,14 @@ class LoanScheduleServiceTest {
     }
 
     @Test
+    void 추가상환이_잔액을_초과해도_월말잔액은_0_이하로_내려가지_않는다() {
+        // 잔액 1,000,000인데 추가상환 5,000,000 → 완납, 잔액 0 (마이너스 없음)
+        MonthResult r = LoanScheduleService.calcMonth(1_000_000L, RATE, 10, 5_000_000L);
+        assertEquals(0L, r.closing(), "월말잔액은 0 (마이너스 금지)");
+        assertTrue(r.principal() <= 1_000_000L, "정기상환액은 잔액을 넘지 않음");
+    }
+
+    @Test
     void 추가상환은_잔액만_줄이고_이자정기는_불변() {
         MonthResult noExtra = LoanScheduleService.calcMonth(830_000_000L, RATE, 360, 0L);
         MonthResult withExtra = LoanScheduleService.calcMonth(830_000_000L, RATE, 360, 10_000_000L);
