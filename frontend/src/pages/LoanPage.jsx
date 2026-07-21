@@ -238,6 +238,17 @@ function PlanTab({ plans, getRateForMonth, latestBalance, totalRepaid, totalInte
   // 완납 이후 완전 비활성(월초 잔액 0) 행은 숨김 → 단축된 개월수 카운트
   const rows = plans.filter(p => (p.loanAmount || 0) > 0);
   const hiddenCount = plans.length - rows.length;
+
+  // 연도별 접기/펼치기 (기본: 올해·내년만 펼침)
+  const thisYear = new Date().getFullYear();
+  const [expandedYears, setExpandedYears] = useState(() => new Set([thisYear, thisYear + 1]));
+  const years = [...new Set(rows.map(p => p.year))];
+  const toggleYear = (y) => setExpandedYears(prev => {
+    const next = new Set(prev);
+    next.has(y) ? next.delete(y) : next.add(y);
+    return next;
+  });
+
   return (
     <>
       <div className="page-header">
@@ -245,8 +256,14 @@ function PlanTab({ plans, getRateForMonth, latestBalance, totalRepaid, totalInte
         <button className="btn" style={{ background: '#1a237e', color: '#fff', marginRight: 6 }} onClick={onGenerate}>📅 30년 스케줄 생성</button>
         <button className="btn" style={{ background: '#2e7d32', color: '#fff', marginRight: 6 }} onClick={onBulkExtra} disabled={plans.length === 0}>💰 추가상환 일괄입력</button>
       </div>
-      <div style={{ fontSize: 12, color: '#888', marginBottom: 12 }}>
-        💡 원리금균등상환(기간유지형). <b>추가 상환액</b>만 입력하면 이후 달의 이자·정기·잔액이 자동 재계산돼요.
+      <div style={{ fontSize: 12, color: '#888', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <span>💡 원리금균등상환(기간유지형). <b>추가 상환액</b>만 입력하면 이후 달의 이자·정기·잔액이 자동 재계산돼요.</span>
+        <span style={{ color: '#bbb' }}>|</span>
+        <span>연도 셀을 클릭하면 접기/펼치기</span>
+        <button className="btn" style={{ padding: '2px 8px', fontSize: 11, background: '#e8eaf6', color: '#3949ab' }}
+                onClick={() => setExpandedYears(new Set(years))}>모두 펼치기</button>
+        <button className="btn" style={{ padding: '2px 8px', fontSize: 11, background: '#e8eaf6', color: '#3949ab' }}
+                onClick={() => setExpandedYears(new Set())}>모두 접기</button>
       </div>
 
       <div className="asset-cards" style={{ marginBottom: 16 }}>
@@ -285,22 +302,52 @@ function PlanTab({ plans, getRateForMonth, latestBalance, totalRepaid, totalInte
             {rows.length === 0 && (
               <tr><td colSpan={11} className="empty-state">상환 스케줄이 없어요. <b>30년 스케줄 생성</b>으로 만들어보세요.</td></tr>
             )}
-            {rows.map((p, idx) => {
+            {years.map((year, yIdx) => {
+              const yearRows = rows.filter(x => x.year === year);
+              const expanded = expandedYears.has(year);
+              const yearBorder = yIdx !== 0 ? { borderTop: '2px solid #9aa0b5' } : undefined;
+              const sum = (f) => yearRows.reduce((s, r) => s + (r[f] || 0), 0);
+              // 클릭 시 해당 연도 접기/펼치기
+              const yearCell = (rowSpan) => (
+                <td className="col-c" rowSpan={rowSpan} onClick={() => toggleYear(year)}
+                    title={expanded ? '접기' : '펼치기'}
+                    style={{ fontWeight: 700, verticalAlign: 'middle', background: '#f5f6fa',
+                             cursor: 'pointer', userSelect: 'none' }}>
+                  <span style={{ color: '#3949ab', marginRight: 4 }}>{expanded ? '▼' : '▶'}</span>{year}년
+                </td>
+              );
+
+              // 접힌 연도: 연간 합계 한 줄
+              if (!expanded) {
+                const first = yearRows[0], last = yearRows[yearRows.length - 1];
+                const rateSet = [...new Set(yearRows.map(r => r.appliedRate && Number(r.appliedRate).toFixed(2)))];
+                return (
+                  <tr key={year} style={yearBorder}>
+                    {yearCell(1)}
+                    <td className="col-c" style={{ color: '#888' }}>{yearRows.length}개월</td>
+                    <td className="col-c" style={{ color: '#888' }}>-</td>
+                    <td className="col-r">{fmt(first.loanAmount)}</td>
+                    <td className="col-c" style={{ fontWeight: 600, color: '#1a237e' }}>
+                      {rateSet.length === 1 && rateSet[0] ? `${rateSet[0]}%` : '-'}
+                    </td>
+                    <td className="col-r" style={{ color: '#e65100', fontWeight: 600 }}>{fmt(sum('interestAmount'))}</td>
+                    <td className="col-r">{fmt(sum('repaymentAmount'))}</td>
+                    <td className="col-r" style={{ fontWeight: 700, color: '#1a237e' }}>{fmt(sum('interestAmount') + sum('repaymentAmount'))}</td>
+                    <td className="col-r" style={{ color: '#2e7d32', fontWeight: 600 }}>{fmt(sum('extraPayment'))}</td>
+                    <td className="col-r" style={{ fontWeight: 700, color: '#c62828' }}>{fmt(last.remainingBalance)}</td>
+                    <td></td>
+                  </tr>
+                );
+              }
+
+              // 펼친 연도: 월별 행
+              return yearRows.map((p, i) => {
               const rateInfo = getRateForMonth(p.year, p.month);
               const hasRateMismatch = rateInfo && p.appliedRate &&
                 Number(rateInfo.annualRate).toFixed(2) !== Number(p.appliedRate).toFixed(2);
-              // 같은 년도끼리 묶어 년도 셀은 그룹의 첫 행에만 rowSpan으로 표시
-              const isYearStart = idx === 0 || rows[idx - 1].year !== p.year;
-              const yearRowSpan = rows.filter(x => x.year === p.year).length;
               return (
-                <tr key={p.id}
-                    style={isYearStart && idx !== 0 ? { borderTop: '2px solid #9aa0b5' } : undefined}>
-                  {isYearStart && (
-                    <td className="col-c" rowSpan={yearRowSpan}
-                        style={{ fontWeight: 700, verticalAlign: 'middle', background: '#f5f6fa' }}>
-                      {p.year}년
-                    </td>
-                  )}
+                <tr key={p.id} style={i === 0 ? yearBorder : undefined}>
+                  {i === 0 && yearCell(yearRows.length)}
                   <td className="col-c" style={{ fontWeight: 600 }}>{p.month}월</td>
                   <td className="col-c" style={{ color: '#888' }}>{p.remainingMonths ?? '-'}</td>
                   <td className="col-r">{fmt(p.loanAmount)}</td>
@@ -333,6 +380,7 @@ function PlanTab({ plans, getRateForMonth, latestBalance, totalRepaid, totalInte
                   </td>
                 </tr>
               );
+              });
             })}
             {rows.length > 0 && (
               <tr className="summary-row">
