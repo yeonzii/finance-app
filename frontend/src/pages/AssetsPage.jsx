@@ -3,7 +3,6 @@ import { getAssetItems, getAssetValues, saveAssetValue, getAllCodes, getTransact
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1);
 const fmt = (n) => n != null && n !== '' ? Number(n).toLocaleString('ko-KR') : '';
-const CARDVALUE = 'CD2210'; // 가변비용 > 카드값
 const NO_SUBTOTAL = ['CD2230', 'CD3410']; // 소계 제외 그룹 (대출상환, 미래에셋)
 
 const TYPES = [
@@ -60,10 +59,10 @@ export default function AssetsPage() {
   const loadValues = useCallback(() => getAssetValues(year).then(setValues), [year]);
   useEffect(() => { loadValues(); }, [loadValues]);
 
-  // 소득=같은 년월 / 지출=다음 달 → 올해 전체 + 내년 1월 거래까지 필요
+  // 소득·지출 모두 같은 년월 거래를 사용 (카드값도 소비월 = 당월 기준)
   useEffect(() => {
-    Promise.all([getTransactions(year), getTransactions(year + 1, 1)])
-      .then(([a, b]) => setTxs([...(a || []), ...(b || [])]))
+    getTransactions(year)
+      .then(a => setTxs(a || []))
       .catch(() => setTxs([]));
   }, [year]);
 
@@ -94,12 +93,8 @@ export default function AssetsPage() {
       return txSum(item.codeId, year, month); // 같은 년월
     }
     if (item.assetType === 'EXPENSE') {
-      // 카드값: 다음 달 거래 → 자산 당월 / 그 외 비용: 당월 거래
-      const isCard = inSubtree(item.codeId, CARDVALUE);
-      const m = isCard ? month + 1 : month;
-      const ty = m > 12 ? year + 1 : year;
-      const tm = m > 12 ? 1 : m;
-      return txSum(item.codeId, ty, tm);
+      // 지출: 카드값 포함 모두 당월 거래 (카드값은 소비월에 입력)
+      return txSum(item.codeId, year, month);
     }
     return valueMap[`${item.id}-${month}`];    // ASSET: 수동
   };
@@ -173,7 +168,7 @@ export default function AssetsPage() {
       </div>
 
       <div style={{ fontSize: 12, color: '#888', marginBottom: 12 }}>
-        💡 <b>소득·지출</b> 행은 소득/지출 내역에서 자동 계산돼요 (소득=같은 달, 지출은 카드값=다음 달·그 외=당월). <b>자산</b> 행만 셀에 직접 입력합니다.
+        💡 <b>소득·지출</b> 행은 소득/지출 내역에서 자동 계산돼요 (모두 같은 달 기준 · 카드값은 소비한 달에 입력). <b>자산</b> 행만 셀에 직접 입력합니다.
       </div>
 
       {!hasItems ? (
