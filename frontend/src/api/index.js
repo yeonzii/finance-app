@@ -120,3 +120,16 @@ export const saveLoanRate = (data) =>
 
 export const deleteLoanRate = (id) =>
   api.delete(`/loans/rates/${id}`);
+
+// ── 카드 소비내역 (TB_CARD_CONSUMPTION) ────────────
+export const getConsumptions = (year, month) =>
+  api.get('/consumptions', { params: { year, month } }).then(r => r.data);
+
+export const importConsumptions = () =>
+  api.post('/consumptions/import').then(r => r.data);
+
+export const updateConsumption = (id, data) =>
+  api.put(`/consumptions/${id}`, data).then(r => r.data);
+
+export const deleteConsumption = (id) =>
+  api.delete(`/consumptions/${id}`);
