@@ -54,6 +54,8 @@ public class ConsumptionService {
             try { raw = Files.readString(f, StandardCharsets.UTF_8).trim(); }
             catch (IOException e) { continue; }
             if (raw.isEmpty()) { move(f, processed); continue; }
+            // 같은 내용이 이미 있으면 건너뜀 (동일 알림을 여러 번 공유한 경우)
+            if (repo.existsByRawTextAndDelYn(raw, "N")) { move(f, processed); continue; }
 
             ConsumptionParser.Parsed p = ConsumptionParser.parse(raw);
             CardConsumption c = new CardConsumption();
