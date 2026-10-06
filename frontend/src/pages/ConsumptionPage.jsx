@@ -107,8 +107,19 @@ export default function ConsumptionPage() {
       if (items.length) groups.push({ code: g.mid.cdId, name: g.mid.cdNm, items, total: items.reduce((s, i) => s + i.amount, 0) });
     });
     if (sum['__none__']) groups.push({ code: '__none__', name: '미분류', items: [], total: sum['__none__'] });
-    return groups.sort((a, b) => b.total - a.total);
+    // 고정 순서: 생활비 → 선택지출 → 고양이 → (기타) → 미분류
+    const ORDER = ['CD5200', 'CD5300', 'CD5100'];
+    const rank = (code) => code === '__none__' ? 999 : (ORDER.indexOf(code) === -1 ? 500 : ORDER.indexOf(code));
+    return groups.sort((a, b) => rank(a.code) - rank(b.code));
   }, [rows, catGroups]);
+
+  // 카드사(수단)별 총 결제금액
+  const byCard = useMemo(() => {
+    const sum = {};
+    rows.forEach(r => { const k = r.cardCode || '기타'; sum[k] = (sum[k] || 0) + (r.amount || 0); });
+    return Object.entries(sum).map(([code, amount]) => ({ code, amount, name: nameOf(code) }))
+                 .sort((a, b) => b.amount - a.amount);
+  }, [rows, codes]);
 
   const onImport = async () => {
     setImporting(true);
@@ -179,6 +190,18 @@ export default function ConsumptionPage() {
         <div className="asset-card">
           <div className="card-label">이번 달 총 소비</div>
           <div className="card-value amount-negative">{fmt(total)}원</div>
+          {byCard.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px 14px', marginTop: 8 }}>
+              {byCard.map(c => {
+                const cc = CARD_COLOR[c.code] || { fg: '#666' };
+                return (
+                  <span key={c.code} style={{ fontSize: 11, color: '#777' }}>
+                    <span style={{ color: cc.fg, fontWeight: 700 }}>{c.name}</span> {fmt(c.amount)}
+                  </span>
+                );
+              })}
+            </div>
+          )}
         </div>
         <div className="asset-card">
           <div className="card-label">건수 (총 / 미분류)</div>
