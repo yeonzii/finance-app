@@ -60,8 +60,8 @@ export default function ConsumptionPage() {
       const leaves = [];
       kids(l2.cdId).forEach(l3 => {
         const l4 = kids(l3.cdId);
-        if (l4.length === 0) leaves.push({ cdId: l3.cdId, cdNm: l3.cdNm });
-        else l4.forEach(x => leaves.push({ cdId: x.cdId, cdNm: `${l3.cdNm} > ${x.cdNm}` }));
+        if (l4.length === 0) leaves.push({ cdId: l3.cdId, cdNm: l3.cdNm, parent: null, leaf: l3.cdNm });
+        else l4.forEach(x => leaves.push({ cdId: x.cdId, cdNm: `${l3.cdNm} > ${x.cdNm}`, parent: l3.cdNm, leaf: x.cdNm }));
       });
       return { mid: l2, leaves };
     });
@@ -109,7 +109,7 @@ export default function ConsumptionPage() {
     const groups = [];
     catGroups.forEach(g => {
       const items = g.leaves.filter(l => sum[l.cdId])
-        .map(l => ({ name: l.cdNm, amount: sum[l.cdId] }))
+        .map(l => ({ parent: l.parent, leaf: l.leaf, amount: sum[l.cdId] }))
         .sort((a, b) => b.amount - a.amount);
       if (items.length) groups.push({ code: g.mid.cdId, name: g.mid.cdNm, items, total: items.reduce((s, i) => s + i.amount, 0) });
     });
@@ -305,7 +305,15 @@ export default function ConsumptionPage() {
                         </tr>
                         {g.items.map((it, i) => (
                           <tr className="cat-leaf" key={i}>
-                            <td className="leaf-name">{it.name}</td>
+                            <td className="leaf-name">
+                              {it.parent && (
+                                <>
+                                  <span style={{ fontSize: 11, color: '#9aa0b0' }}>{it.parent}</span>
+                                  <span className="leaf-dot" />
+                                </>
+                              )}
+                              <span style={{ fontWeight: 700, color: '#333' }}>{it.leaf}</span>
+                            </td>
                             <td className="col-r" style={{ color: '#444' }}>{fmt(it.amount)}</td>
                             <td style={{ fontSize: 12, color: '#999' }}>{total ? Math.round(it.amount / total * 100) : 0}%</td>
                           </tr>
