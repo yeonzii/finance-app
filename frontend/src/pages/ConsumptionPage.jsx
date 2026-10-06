@@ -104,6 +104,23 @@ export default function ConsumptionPage() {
     });
   }, [rows]);
 
+  // 일별 동적 목표: 그날 시점의 (남은 예산 ÷ 그날부터 남은 일수)
+  // 전날까지 많이 썼으면 이후 일 목표가 줄어든다.
+  const dayTargets = useMemo(() => {
+    const target = budget?.amount || 0;
+    const dim = new Date(year, month, 0).getDate();
+    const asc = [...days].sort((a, b) => a.key.localeCompare(b.key));
+    const res = {};
+    let prior = 0; // 그날 이전까지 누적 소비
+    asc.forEach(d => {
+      const dayNum = parseInt(d.key.slice(8, 10), 10);
+      const daysLeft = Math.max(1, dim - dayNum + 1);
+      res[d.key] = (target - prior) / daysLeft;
+      prior += d.total;
+    });
+    return res;
+  }, [days, budget, year, month]);
+
   // 펼침 여부: 사용자가 직접 연/닫은 게 우선, 없으면 오늘·미분류는 기본 펼침
   const isDayOpen = (d) =>
     userOpened.has(d.key) ? true
@@ -342,7 +359,7 @@ export default function ConsumptionPage() {
                             {d.unclassified.length > 0 && <span className="day-badge">미분류 {d.unclassified.length}</span>}
                             <span className="spacer" />
                             <span className="day-total" style={bud.target > 0
-                              ? { color: d.total > bud.target / bud.daysInMonth ? '#c62828' : '#2196f3' }
+                              ? { color: d.total > dayTargets[d.key] ? '#c62828' : '#2196f3' }
                               : undefined}>{fmt(d.total)}원</span>
                           </div>
                         </td>
