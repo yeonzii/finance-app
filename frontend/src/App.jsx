@@ -15,7 +15,7 @@ const TABS = [
   { key: 'assets', label: '📊 자산 현황' },
   { key: 'assetItems', label: '🧩 자산 항목 구성' },
   { key: 'loans', label: '🏦 대출 상환 계획' },
-  { key: 'consumption', label: '🧾 카드 소비내역' },
+  { key: 'consumption', label: '🧾 소비내역' },
   { key: 'payment', label: '💳 결제기관 관리' },
   { key: 'codes', label: '⚙️ 공통코드 관리' },
 ];

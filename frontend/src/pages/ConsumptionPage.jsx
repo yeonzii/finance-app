@@ -171,7 +171,7 @@ export default function ConsumptionPage() {
   return (
     <div>
       <div className="page-header">
-        <h2>카드 소비내역</h2>
+        <h2>소비내역</h2>
         <div className="selector">
           <select value={year} onChange={e => setYear(+e.target.value)}>
             {[2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
