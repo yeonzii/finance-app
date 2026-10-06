@@ -50,14 +50,21 @@ export default function ConsumptionPage() {
   const nameOf = (code) => codes.find(c => c.cdId === code)?.cdNm ?? code ?? '-';
   const cardOptions = CARD_SELECT_CODES.map(cd => ({ cd, nm: nameOf(cd) }));
 
+  // 중분류(L2)로 묶되, 각 가지의 '말단' 노드를 선택지로 노출
+  // (하위가 있으면 더 깊은 레벨, 없으면 그 레벨 자체가 말단)
   const catGroups = useMemo(() => {
-    const mids = codes.filter(c => c.parentCdId === CONSUM_ROOT && c.delYn === 'N')
-                      .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
-    return mids.map(m => ({
-      mid: m,
-      leaves: codes.filter(c => c.parentCdId === m.cdId && c.delYn === 'N')
-                   .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0)),
-    }));
+    const consum = codes.filter(c => c.cdId?.startsWith('CD5') && c.cdId !== CONSUM_ROOT && c.delYn === 'N');
+    const kids = (id) => consum.filter(c => c.parentCdId === id).sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+    const l2s = consum.filter(c => c.parentCdId === CONSUM_ROOT).sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+    return l2s.map(l2 => {
+      const leaves = [];
+      kids(l2.cdId).forEach(l3 => {
+        const l4 = kids(l3.cdId);
+        if (l4.length === 0) leaves.push({ cdId: l3.cdId, cdNm: l3.cdNm });
+        else l4.forEach(x => leaves.push({ cdId: x.cdId, cdNm: `${l3.cdNm} > ${x.cdNm}` }));
+      });
+      return { mid: l2, leaves };
+    });
   }, [codes]);
 
   const total = rows.reduce((s, r) => s + (r.amount || 0), 0);
