@@ -136,3 +136,10 @@ export const deleteConsumption = (id) =>
 
 export const createConsumption = (data) =>
   api.post('/consumptions', data).then(r => r.data);
+
+// ── 월 소비 목표액 ────────────────────────────────
+export const getBudget = (year, month) =>
+  api.get('/budgets', { params: { year, month } }).then(r => r.data);
+
+export const saveBudget = (data) =>
+  api.post('/budgets', data).then(r => r.data);

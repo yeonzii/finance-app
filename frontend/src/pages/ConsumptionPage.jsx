@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef, Fragment } from 'react';
 import {
   getConsumptions, importConsumptions, updateConsumption, deleteConsumption,
-  createConsumption, getAllCodes,
+  createConsumption, getAllCodes, getBudget, saveBudget,
 } from '../api';
 
 const CARD_ROOT_CODES = ['CD2211', 'CD2212', 'CD2213', 'CD2214', 'CD2215', 'CD2216'];
@@ -36,13 +36,16 @@ export default function ConsumptionPage() {
   const [codes, setCodes] = useState([]);
   const [importing, setImporting] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
+  const [budget, setBudget] = useState(null);
+  const [budgetModal, setBudgetModal] = useState(false);
 
   // 일자별 폴딩: 사용자가 직접 연/닫은 날짜만 기록, 나머지는 동적 기본값(오늘·미분류 펼침)
   const [userOpened, setUserOpened] = useState(() => new Set());
   const [userClosed, setUserClosed] = useState(() => new Set());
 
   const load = () => getConsumptions(year, month).then(setRows);
-  useEffect(() => { load(); }, [year, month]);
+  const loadBudget = () => getBudget(year, month).then(setBudget).catch(() => setBudget(null));
+  useEffect(() => { load(); loadBudget(); }, [year, month]);
   useEffect(() => { getAllCodes().then(setCodes); }, []);
   // 월 바뀌면 사용자 폴딩 선택 초기화
   useEffect(() => { setUserOpened(new Set()); setUserClosed(new Set()); }, [year, month]);
@@ -69,6 +72,24 @@ export default function ConsumptionPage() {
 
   const total = rows.reduce((s, r) => s + (r.amount || 0), 0);
   const unclassified = rows.filter(r => !r.categoryCode).length;
+
+  // 월 소비 목표 대비 분석
+  const bud = useMemo(() => {
+    const target = budget?.amount || 0;
+    const nowD = new Date();
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const isCurrent = year === nowD.getFullYear() && (month === nowD.getMonth() + 1);
+    const isPast = year < nowD.getFullYear() || (year === nowD.getFullYear() && month < nowD.getMonth() + 1);
+    const elapsed = isCurrent ? nowD.getDate() : (isPast ? daysInMonth : 0);
+    const remaining = Math.max(0, daysInMonth - elapsed);
+    const paceTarget = target * elapsed / daysInMonth;          // 오늘까지 적정 누적
+    const overUnder = total - paceTarget;                       // +면 페이스 초과
+    const projected = elapsed > 0 ? Math.round(total / elapsed * daysInMonth) : 0;  // 월말 예상
+    const recommended = remaining > 0 ? Math.max(0, Math.round((target - total) / remaining)) : 0;
+    const usedPct = target > 0 ? Math.round(total / target * 100) : 0;
+    const pacePct = target > 0 ? Math.min(100, Math.round(paceTarget / target * 100)) : 0;
+    return { target, daysInMonth, isCurrent, elapsed, remaining, paceTarget, overUnder, projected, recommended, usedPct, pacePct };
+  }, [budget, rows, total, year, month]);
 
   // 일자별 그룹 (최신일 먼저)
   const days = useMemo(() => {
@@ -171,7 +192,7 @@ export default function ConsumptionPage() {
   return (
     <div>
       <div className="page-header">
-        <h2>소비내역</h2>
+        <h2>소비 내역</h2>
         <div className="selector">
           <select value={year} onChange={e => setYear(+e.target.value)}>
             {[2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
@@ -191,6 +212,68 @@ export default function ConsumptionPage() {
       </div>
       <div style={{ fontSize: 12, color: '#888', marginBottom: 16 }}>
         💡 일자를 눌러 접고 펼칠 수 있어요. <b>오늘</b>과 <b>미분류가 있는 날</b>은 자동으로 펼쳐집니다.
+      </div>
+
+      {/* 월 소비 목표 모니터링 */}
+      <div className="budget-panel">
+        <div className="budget-head">
+          <span className="title">🎯 월 소비 목표</span>
+          <span className="spacer" />
+          <button className="btn" style={{ background: '#1a237e', color: '#fff', padding: '5px 12px', fontSize: 12 }}
+                  onClick={() => setBudgetModal(true)}>
+            {bud.target > 0 ? '변경' : '설정'}
+          </button>
+        </div>
+
+        {bud.target > 0 ? (
+          <>
+            <div className="budget-amounts">
+              <span className="cur">{fmt(total)}</span>
+              <span className="sep">/</span>
+              <span className="tgt">{fmt(bud.target)}원</span>
+              <span className="pct" style={{ color: total > bud.target ? '#c62828' : '#2e7d32' }}>{bud.usedPct}%</span>
+            </div>
+            <div className="budget-bar">
+              <div className="budget-bar-fill" style={{
+                width: Math.min(100, bud.usedPct) + '%',
+                background: total > bud.target ? '#c62828' : (bud.isCurrent && bud.overUnder > 0 ? '#ef6c00' : '#2e7d32'),
+              }} />
+              {bud.isCurrent && <div className="budget-pace" style={{ left: bud.pacePct + '%' }} />}
+            </div>
+            <div className="budget-metrics">
+              <div className="budget-metric">
+                <div className="m-label">{total > bud.target ? '목표 초과' : '남은 금액'}</div>
+                <div className="m-value" style={{ color: total > bud.target ? '#c62828' : '#1a237e' }}>
+                  {fmt(Math.abs(bud.target - total))}원
+                </div>
+              </div>
+              {bud.isCurrent && (
+                <>
+                  <div className="budget-metric">
+                    <div className="m-label">기간 대비 (오늘 {bud.elapsed}일차)</div>
+                    <div className="m-value" style={{ color: bud.overUnder > 0 ? '#c62828' : '#2e7d32' }}>
+                      {bud.overUnder > 0 ? `+${fmt(Math.round(bud.overUnder))} 초과` : `${fmt(Math.round(-bud.overUnder))} 여유`}
+                    </div>
+                  </div>
+                  <div className="budget-metric">
+                    <div className="m-label">남은 {bud.remaining}일 · 하루 권장</div>
+                    <div className="m-value" style={{ color: bud.recommended > 0 ? '#1a237e' : '#c62828' }}>
+                      {bud.recommended > 0 ? `${fmt(bud.recommended)}원` : '초과 (0원)'}
+                    </div>
+                  </div>
+                  <div className="budget-metric">
+                    <div className="m-label">이대로면 월말 예상</div>
+                    <div className="m-value" style={{ color: bud.projected > bud.target ? '#c62828' : '#2e7d32' }}>
+                      {fmt(bud.projected)}원
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </>
+        ) : (
+          <div className="budget-empty">목표가 없어요. <b>설정</b> 버튼으로 이번 달 소비 목표를 정하면 진행 상황을 모니터링해요.</div>
+        )}
       </div>
 
       <div className="asset-cards" style={{ marginBottom: 20 }}>
@@ -352,6 +435,48 @@ export default function ConsumptionPage() {
           }}
         />
       )}
+
+      {budgetModal && (
+        <BudgetModal
+          current={budget?.amount || ''}
+          year={year} month={month}
+          onClose={() => setBudgetModal(false)}
+          onSave={async (amount) => {
+            await saveBudget({ year, month, amount });
+            setBudgetModal(false);
+            loadBudget();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// 월 소비 목표 설정 모달
+function BudgetModal({ current, year, month, onClose, onSave }) {
+  const [amountStr, setAmountStr] = useState(current ? Number(current).toLocaleString('ko-KR') : '');
+  const amount = Number(amountStr.replace(/[^0-9]/g, '')) || 0;
+  const downOnOverlay = useRef(false);
+  return (
+    <div className="modal-overlay"
+         onMouseDown={e => { downOnOverlay.current = e.target === e.currentTarget; }}
+         onClick={e => { if (e.target === e.currentTarget && downOnOverlay.current) onClose(); }}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <h3>{year}년 {month}월 소비 목표</h3>
+        <div style={{ background: '#e8eaf6', borderRadius: 8, padding: '8px 12px', marginBottom: 14, fontSize: 12, color: '#3949ab' }}>
+          이 달의 목표 소비액을 정하면, 현재 소비·기간 대비 초과 여부·하루 권장액을 계속 보여줘요. 언제든 변경 가능.
+        </div>
+        <div className="form-group full">
+          <label>월 목표 소비액 (원)</label>
+          <input type="text" inputMode="numeric" autoFocus value={amountStr} placeholder="예: 1,500,000"
+                 onChange={e => setAmountStr(e.target.value.replace(/[^0-9,]/g, ''))}
+                 onBlur={() => setAmountStr(amount ? amount.toLocaleString('ko-KR') : '')} />
+        </div>
+        <div className="modal-actions">
+          <button className="btn btn-cancel" onClick={onClose}>취소</button>
+          <button className="btn btn-primary" disabled={amount <= 0} onClick={() => onSave(amount)}>저장</button>
+        </div>
+      </div>
     </div>
   );
 }

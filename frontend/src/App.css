@@ -277,3 +277,22 @@ tr:last-child td { border-bottom: none; }
   display: inline-block; width: 4px; height: 4px; border-radius: 50%;
   background: #cdd2e0; margin: 0 7px; vertical-align: middle;
 }
+
+/* 월 소비 목표 패널 */
+.budget-panel { background:#fff; border-radius:10px; box-shadow:0 1px 4px rgba(0,0,0,.1); padding:16px 20px; margin-bottom:20px; }
+.budget-head { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+.budget-head .title { font-size:14px; font-weight:700; color:#1a237e; }
+.budget-head .spacer { flex:1; }
+.budget-amounts { font-size:22px; font-weight:800; margin-bottom:10px; }
+.budget-amounts .cur { color:#c62828; }
+.budget-amounts .sep { color:#bbb; font-weight:400; margin:0 6px; }
+.budget-amounts .tgt { color:#333; }
+.budget-amounts .pct { font-size:14px; font-weight:700; margin-left:8px; }
+.budget-bar { position:relative; height:14px; background:#eef0f6; border-radius:8px; }
+.budget-bar-fill { height:100%; border-radius:8px; }
+.budget-pace { position:absolute; top:-4px; bottom:-4px; width:2px; background:#37474f; }
+.budget-pace::after { content:'적정'; position:absolute; top:-15px; left:50%; transform:translateX(-50%); font-size:9px; color:#37474f; white-space:nowrap; }
+.budget-metrics { display:flex; flex-wrap:wrap; gap:22px; margin-top:16px; }
+.budget-metric .m-label { font-size:11px; color:#888; margin-bottom:2px; }
+.budget-metric .m-value { font-size:15px; font-weight:700; color:#333; }
+.budget-empty { color:#888; font-size:13px; padding:4px 0; }
