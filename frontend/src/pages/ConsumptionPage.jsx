@@ -95,16 +95,19 @@ export default function ConsumptionPage() {
     setUserClosed(p => { const n = new Set(p); n.delete(key); return n; });
   };
 
-  // 카테고리별(말단) 합계
-  const byCategory = useMemo(() => {
+  // 분류(중분류)로 묶은 카테고리별 합계 — 분류 소계 + 분류 내 항목 나열
+  const byGroup = useMemo(() => {
     const sum = {};
-    rows.forEach(r => { const leaf = r.categoryCode || '__none__'; sum[leaf] = (sum[leaf] || 0) + (r.amount || 0); });
-    const out = [];
-    catGroups.forEach(g => g.leaves.forEach(l => {
-      if (sum[l.cdId]) out.push({ group: g.mid.cdId, mid: g.mid.cdNm, leaf: l.cdNm, amount: sum[l.cdId] });
-    }));
-    if (sum['__none__']) out.push({ group: '__none__', mid: '미분류', leaf: '-', amount: sum['__none__'] });
-    return out.sort((a, b) => b.amount - a.amount);
+    rows.forEach(r => { const k = r.categoryCode || '__none__'; sum[k] = (sum[k] || 0) + (r.amount || 0); });
+    const groups = [];
+    catGroups.forEach(g => {
+      const items = g.leaves.filter(l => sum[l.cdId])
+        .map(l => ({ name: l.cdNm, amount: sum[l.cdId] }))
+        .sort((a, b) => b.amount - a.amount);
+      if (items.length) groups.push({ code: g.mid.cdId, name: g.mid.cdNm, items, total: items.reduce((s, i) => s + i.amount, 0) });
+    });
+    if (sum['__none__']) groups.push({ code: '__none__', name: '미분류', items: [], total: sum['__none__'] });
+    return groups.sort((a, b) => b.total - a.total);
   }, [rows, catGroups]);
 
   const onImport = async () => {
@@ -165,7 +168,7 @@ export default function ConsumptionPage() {
           {importing ? '불러오는 중…' : '📥 문자 불러오기'}
         </button>
         <button className="btn" style={{ background: '#546e7a', color: '#fff' }} onClick={() => setManualOpen(true)}>
-          ✍️ 수기 추가
+          ✍️ 직접 추가
         </button>
       </div>
       <div style={{ fontSize: 12, color: '#888', marginBottom: 16 }}>
@@ -178,16 +181,17 @@ export default function ConsumptionPage() {
           <div className="card-value amount-negative">{fmt(total)}원</div>
         </div>
         <div className="asset-card">
-          <div className="card-label">건수</div>
-          <div className="card-value">{rows.length}건</div>
-        </div>
-        <div className="asset-card">
-          <div className="card-label">미분류</div>
-          <div className="card-value" style={{ color: unclassified ? '#e65100' : '#2e7d32' }}>{unclassified}건</div>
+          <div className="card-label">건수 (총 / 미분류)</div>
+          <div className="card-value">
+            {rows.length}
+            <span style={{ color: '#bbb', fontWeight: 400 }}> / </span>
+            <span style={{ color: unclassified ? '#e65100' : '#2e7d32' }}>{unclassified}</span>
+            <span style={{ fontSize: 14, color: '#888', fontWeight: 400 }}> 건</span>
+          </div>
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 24 }}>
+      <div className="consum-cols">
         {/* 건별 내역 (일자별 폴딩) */}
         <section>
           <div className="section-title">건별 내역</div>
@@ -246,33 +250,41 @@ export default function ConsumptionPage() {
           </div>
         </section>
 
-        {/* 카테고리별 월 합계 */}
-        {byCategory.length > 0 && (
+        {/* 분류별 월 합계 */}
+        {byGroup.length > 0 && (
           <section>
             <div className="section-title">이번 달 카테고리별 소비</div>
             <div className="table-wrap">
               <table>
                 <thead>
-                  <tr><th style={{ width: 120 }}>분류</th><th style={{ width: 140 }}>항목</th><th style={{ width: 130 }}>금액</th><th>비중</th></tr>
+                  <tr><th>분류 / 항목</th><th style={{ width: 110 }}>금액</th><th style={{ width: 130 }}>비중</th></tr>
                 </thead>
                 <tbody>
-                  {byCategory.map((c, i) => {
-                    const pct = total ? Math.round(c.amount / total * 100) : 0;
-                    const color = GROUP_COLOR[c.group] || '#90a4ae';
+                  {byGroup.map(g => {
+                    const gpct = total ? Math.round(g.total / total * 100) : 0;
+                    const color = GROUP_COLOR[g.code] || '#90a4ae';
                     return (
-                      <tr key={i}>
-                        <td className="col-c"><span className="card-chip" style={{ background: color + '22', color }}>{c.mid}</span></td>
-                        <td className="col-c" style={{ color: '#444' }}>{c.leaf}</td>
-                        <td className="col-r" style={{ fontWeight: 700 }}>{fmt(c.amount)}</td>
-                        <td>
-                          <span className="bar-track"><span className="bar-fill" style={{ width: pct + '%', background: color }} /></span>
-                          <span style={{ marginLeft: 8, fontSize: 12, color: '#888' }}>{pct}%</span>
-                        </td>
-                      </tr>
+                      <Fragment key={g.code}>
+                        <tr className="cat-group">
+                          <td><span className="card-chip" style={{ background: color + '22', color }}>{g.name}</span></td>
+                          <td className="col-r">{fmt(g.total)}</td>
+                          <td>
+                            <span className="bar-track" style={{ width: 70 }}><span className="bar-fill" style={{ width: gpct + '%', background: color }} /></span>
+                            <span style={{ marginLeft: 6, fontSize: 12, color: '#555', fontWeight: 700 }}>{gpct}%</span>
+                          </td>
+                        </tr>
+                        {g.items.map((it, i) => (
+                          <tr className="cat-leaf" key={i}>
+                            <td className="leaf-name">{it.name}</td>
+                            <td className="col-r" style={{ color: '#444' }}>{fmt(it.amount)}</td>
+                            <td style={{ fontSize: 12, color: '#999' }}>{total ? Math.round(it.amount / total * 100) : 0}%</td>
+                          </tr>
+                        ))}
+                      </Fragment>
                     );
                   })}
                   <tr className="summary-row">
-                    <td className="col-c" colSpan={2}>합계</td>
+                    <td>합계</td>
                     <td className="col-r">{fmt(total)}</td>
                     <td>100%</td>
                   </tr>
@@ -342,7 +354,7 @@ function ManualAddModal({ cardOptions, catGroups, defaultYear, defaultMonth, onC
          onMouseDown={e => { downOnOverlay.current = e.target === e.currentTarget; }}
          onClick={e => { if (e.target === e.currentTarget && downOnOverlay.current) onClose(); }}>
       <div className="modal" onClick={e => e.stopPropagation()}>
-        <h3>소비내역 수기 추가</h3>
+        <h3>소비내역 직접 추가</h3>
         <div style={{ background: '#eceff1', borderRadius: 8, padding: '8px 12px', marginBottom: 14, fontSize: 12, color: '#546e7a' }}>
           현금 결제 등 문자로 안 들어오는 소비를 직접 추가해요. 수단은 <b>현금</b>이 기본이며 카드로도 바꿀 수 있어요.
         </div>
