@@ -1,10 +1,12 @@
 import { useState, useEffect, useMemo, useRef, Fragment } from 'react';
 import {
   getConsumptions, importConsumptions, updateConsumption, deleteConsumption,
-  getAllCodes,
+  createConsumption, getAllCodes,
 } from '../api';
 
 const CARD_ROOT_CODES = ['CD2211', 'CD2212', 'CD2213', 'CD2214', 'CD2215', 'CD2216'];
+const CASH_CODE = 'CD3170'; // 현금
+const CARD_SELECT_CODES = [...CARD_ROOT_CODES, CASH_CODE]; // 수단 선택 옵션(카드+현금)
 const CONSUM_ROOT = 'CD5000';
 const fmt = (n) => n != null ? Number(n).toLocaleString('ko-KR') : '-';
 const now = new Date();
@@ -14,6 +16,7 @@ const CARD_COLOR = {
   CD2211: { bg: '#e3f2fd', fg: '#1565c0' }, CD2212: { bg: '#fff8e1', fg: '#f9a825' },
   CD2213: { bg: '#e8f5e9', fg: '#2e7d32' }, CD2214: { bg: '#ede7f6', fg: '#5e35b1' },
   CD2215: { bg: '#fce4ec', fg: '#c2185b' }, CD2216: { bg: '#e0f2f1', fg: '#00796b' },
+  CD3170: { bg: '#eceff1', fg: '#546e7a' }, // 현금
 };
 const GROUP_COLOR = { CD5100: '#8e24aa', CD5200: '#1565c0', CD5300: '#e65100', __none__: '#bdbdbd' };
 
@@ -31,20 +34,21 @@ export default function ConsumptionPage() {
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [rows, setRows] = useState([]);
   const [codes, setCodes] = useState([]);
-  const [loaded, setLoaded] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [manualOpen, setManualOpen] = useState(false);
 
-  // 일자별 폴딩 상태
-  const [openDays, setOpenDays] = useState(() => new Set());   // 펼쳐진 날짜
-  const [userDays, setUserDays] = useState(() => new Set());   // 사용자가 직접 연 날짜(→전체 표시)
-  const initedRef = useRef(null);
+  // 일자별 폴딩: 사용자가 직접 연/닫은 날짜만 기록, 나머지는 동적 기본값(오늘·미분류 펼침)
+  const [userOpened, setUserOpened] = useState(() => new Set());
+  const [userClosed, setUserClosed] = useState(() => new Set());
 
-  const load = () => { setLoaded(false); return getConsumptions(year, month).then(d => { setRows(d); setLoaded(true); }); };
+  const load = () => getConsumptions(year, month).then(setRows);
   useEffect(() => { load(); }, [year, month]);
   useEffect(() => { getAllCodes().then(setCodes); }, []);
+  // 월 바뀌면 사용자 폴딩 선택 초기화
+  useEffect(() => { setUserOpened(new Set()); setUserClosed(new Set()); }, [year, month]);
 
   const nameOf = (code) => codes.find(c => c.cdId === code)?.cdNm ?? code ?? '-';
-  const cardOptions = CARD_ROOT_CODES.map(cd => ({ cd, nm: nameOf(cd) }));
+  const cardOptions = CARD_SELECT_CODES.map(cd => ({ cd, nm: nameOf(cd) }));
 
   const catGroups = useMemo(() => {
     const mids = codes.filter(c => c.parentCdId === CONSUM_ROOT && c.delYn === 'N')
@@ -72,22 +76,24 @@ export default function ConsumptionPage() {
     });
   }, [rows]);
 
-  // 월 진입 시 1회 초기 폴딩: 오늘 + 미분류 있는 날 펼침
-  const initKey = `${year}-${month}`;
-  useEffect(() => {
-    if (!loaded || initedRef.current === initKey) return;
-    const init = new Set();
-    days.forEach(d => { if (d.isToday || d.unclassified.length > 0) init.add(d.key); });
-    setOpenDays(init);
-    setUserDays(new Set());
-    initedRef.current = initKey;
-  }, [loaded, days, initKey]);
-
-  const toggleDay = (key) => {
-    setUserDays(prev => new Set(prev).add(key));
-    setOpenDays(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; });
+  // 펼침 여부: 사용자가 직접 연/닫은 게 우선, 없으면 오늘·미분류는 기본 펼침
+  const isDayOpen = (d) =>
+    userOpened.has(d.key) ? true
+    : userClosed.has(d.key) ? false
+    : (d.isToday || d.unclassified.length > 0);
+  const toggleDay = (d) => {
+    if (isDayOpen(d)) {
+      setUserClosed(p => new Set(p).add(d.key));
+      setUserOpened(p => { const n = new Set(p); n.delete(d.key); return n; });
+    } else {
+      setUserOpened(p => new Set(p).add(d.key));
+      setUserClosed(p => { const n = new Set(p); n.delete(d.key); return n; });
+    }
   };
-  const showAllOfDay = (key) => setUserDays(prev => new Set(prev).add(key));
+  const showAllOfDay = (key) => {
+    setUserOpened(p => new Set(p).add(key));
+    setUserClosed(p => { const n = new Set(p); n.delete(key); return n; });
+  };
 
   // 카테고리별(말단) 합계
   const byCategory = useMemo(() => {
@@ -158,6 +164,9 @@ export default function ConsumptionPage() {
         <button className="btn btn-primary" onClick={onImport} disabled={importing}>
           {importing ? '불러오는 중…' : '📥 문자 불러오기'}
         </button>
+        <button className="btn" style={{ background: '#546e7a', color: '#fff' }} onClick={() => setManualOpen(true)}>
+          ✍️ 수기 추가
+        </button>
       </div>
       <div style={{ fontSize: 12, color: '#888', marginBottom: 16 }}>
         💡 일자를 눌러 접고 펼칠 수 있어요. <b>오늘</b>과 <b>미분류가 있는 날</b>은 자동으로 펼쳐집니다.
@@ -200,13 +209,13 @@ export default function ConsumptionPage() {
                   <tr><td colSpan={7} className="empty-state">소비내역이 없어요. <b>문자 불러오기</b>를 눌러보세요.</td></tr>
                 )}
                 {days.map(d => {
-                  const isOpen = openDays.has(d.key);
-                  const showAll = d.isToday || userDays.has(d.key);
+                  const isOpen = isDayOpen(d);
+                  const showAll = d.isToday || userOpened.has(d.key);
                   const visible = !isOpen ? [] : (showAll ? d.rows : d.unclassified);
                   const hiddenClassified = d.rows.length - d.unclassified.length;
                   return (
                     <Fragment key={d.key}>
-                      <tr className="day-header" onClick={() => toggleDay(d.key)}>
+                      <tr className="day-header" onClick={() => toggleDay(d)}>
                         <td colSpan={7}>
                           <div className="day-row">
                             <span className="chev">{isOpen ? '▾' : '▸'}</span>
@@ -272,6 +281,112 @@ export default function ConsumptionPage() {
             </div>
           </section>
         )}
+      </div>
+
+      {manualOpen && (
+        <ManualAddModal
+          cardOptions={cardOptions}
+          catGroups={catGroups}
+          defaultYear={year}
+          defaultMonth={month}
+          onClose={() => setManualOpen(false)}
+          onSave={async (data) => {
+            await createConsumption(data);
+            setManualOpen(false);
+            // 추가한 달로 이동 후 로드
+            if (data._year !== year || data._month !== month) {
+              setYear(data._year); setMonth(data._month);
+            } else {
+              load();
+            }
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// 수기 추가 모달 (현금 등)
+function ManualAddModal({ cardOptions, catGroups, defaultYear, defaultMonth, onClose, onSave }) {
+  const n = new Date();
+  const two = (x) => String(x).padStart(2, '0');
+  // 보는 달의 1일(또는 현재월이면 오늘)을 기본 일자로
+  const isCur = defaultYear === n.getFullYear() && defaultMonth === n.getMonth() + 1;
+  const defDate = isCur
+    ? `${defaultYear}-${two(defaultMonth)}-${two(n.getDate())}`
+    : `${defaultYear}-${two(defaultMonth)}-01`;
+  const [date, setDate] = useState(defDate);
+  const [time, setTime] = useState(`${two(n.getHours())}:${two(n.getMinutes())}`);
+  const [cardCode, setCardCode] = useState('CD3170'); // 기본 현금
+  const [merchant, setMerchant] = useState('');
+  const [amountStr, setAmountStr] = useState('');
+  const [categoryCode, setCategoryCode] = useState('');
+
+  const amount = Number(amountStr.replace(/[^0-9]/g, '')) || 0;
+  const valid = date && amount > 0;
+
+  const submit = () => {
+    const usedAt = `${date}T${time || '00:00'}:00`;
+    const [y, m] = date.split('-').map(Number);
+    onSave({
+      usedAt, cardCode, amount,
+      merchant: merchant.trim() || null,
+      categoryCode: categoryCode || null,
+      _year: y, _month: m,
+    });
+  };
+
+  const downOnOverlay = useRef(false);
+  return (
+    <div className="modal-overlay"
+         onMouseDown={e => { downOnOverlay.current = e.target === e.currentTarget; }}
+         onClick={e => { if (e.target === e.currentTarget && downOnOverlay.current) onClose(); }}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <h3>소비내역 수기 추가</h3>
+        <div style={{ background: '#eceff1', borderRadius: 8, padding: '8px 12px', marginBottom: 14, fontSize: 12, color: '#546e7a' }}>
+          현금 결제 등 문자로 안 들어오는 소비를 직접 추가해요. 수단은 <b>현금</b>이 기본이며 카드로도 바꿀 수 있어요.
+        </div>
+        <div className="form-grid">
+          <div className="form-group">
+            <label>일자</label>
+            <input type="date" value={date} onChange={e => setDate(e.target.value)} />
+          </div>
+          <div className="form-group">
+            <label>시각</label>
+            <input type="time" value={time} onChange={e => setTime(e.target.value)} />
+          </div>
+          <div className="form-group">
+            <label>수단</label>
+            <select value={cardCode} onChange={e => setCardCode(e.target.value)}>
+              {cardOptions.map(o => <option key={o.cd} value={o.cd}>{o.nm}</option>)}
+            </select>
+          </div>
+          <div className="form-group">
+            <label>금액 (원)</label>
+            <input type="text" inputMode="numeric" value={amountStr} placeholder="예: 15000"
+                   onChange={e => setAmountStr(e.target.value.replace(/[^0-9,]/g, ''))}
+                   onBlur={e => setAmountStr(amount ? amount.toLocaleString('ko-KR') : '')} />
+          </div>
+          <div className="form-group full">
+            <label>가맹점</label>
+            <input type="text" value={merchant} placeholder="예: 전통시장" onChange={e => setMerchant(e.target.value)} />
+          </div>
+          <div className="form-group full">
+            <label>소비 카테고리 (선택)</label>
+            <select value={categoryCode} onChange={e => setCategoryCode(e.target.value)}>
+              <option value="">— 미분류 —</option>
+              {catGroups.map(g => (
+                <optgroup key={g.mid.cdId} label={g.mid.cdNm}>
+                  {g.leaves.map(l => <option key={l.cdId} value={l.cdId}>{l.cdNm}</option>)}
+                </optgroup>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div className="modal-actions">
+          <button className="btn btn-cancel" onClick={onClose}>취소</button>
+          <button className="btn btn-primary" disabled={!valid} onClick={submit}>추가</button>
+        </div>
       </div>
     </div>
   );

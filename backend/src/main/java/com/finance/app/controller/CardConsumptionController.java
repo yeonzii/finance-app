@@ -29,6 +29,21 @@ public class CardConsumptionController {
         return repo.findAll();
     }
 
+    /** 수기 추가 (현금 등) */
+    @PostMapping
+    public CardConsumption create(@RequestBody CardConsumption body) {
+        java.time.LocalDateTime used = body.getUsedAt() != null ? body.getUsedAt() : java.time.LocalDateTime.now();
+        body.setUsedAt(used);
+        body.setYear(used.getYear());
+        body.setMonth(used.getMonthValue());
+        body.setId(null);
+        body.setSourceFile(null);
+        if (body.getRawText() == null) body.setRawText("수기입력");
+        body.setDelYn("N");
+        body.setCreatedAt(java.time.LocalDateTime.now());
+        return repo.save(body);
+    }
+
     /** iCloud 받은편지함 적재 */
     @PostMapping("/import")
     public Map<String, Object> importInbox() {

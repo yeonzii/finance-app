@@ -133,3 +133,6 @@ export const updateConsumption = (id, data) =>
 
 export const deleteConsumption = (id) =>
   api.delete(`/consumptions/${id}`);
+
+export const createConsumption = (data) =>
+  api.post('/consumptions', data).then(r => r.data);
