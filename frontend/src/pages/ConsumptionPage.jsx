@@ -341,7 +341,9 @@ export default function ConsumptionPage() {
                             <span style={{ color: '#888', fontWeight: 400 }}>· {d.rows.length}건</span>
                             {d.unclassified.length > 0 && <span className="day-badge">미분류 {d.unclassified.length}</span>}
                             <span className="spacer" />
-                            <span className="day-total">{fmt(d.total)}원</span>
+                            <span className="day-total" style={bud.target > 0
+                              ? { color: d.total > bud.target / bud.daysInMonth ? '#c62828' : '#2196f3' }
+                              : undefined}>{fmt(d.total)}원</span>
                           </div>
                         </td>
                       </tr>
